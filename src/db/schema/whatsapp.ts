@@ -10,7 +10,31 @@ export const whatsappTable = sqliteTable("whatsapp", {
   description: text("description"),
   slug: text("slug").notNull().unique(),
   phoneNumber: text("phone_number").notNull().unique(),
+  connected: integer("connected", { mode: 'boolean' }).notNull(),
   enabled: integer("enabled", { mode: 'boolean' }).notNull(),
+});
+
+export const contactTable = sqliteTable("contact", {
+  id: text("id").primaryKey(),
+  whatsappId: text("whatsapp_id")
+    .notNull()
+    .references(() => whatsappTable.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  pushName: text("push_name").notNull(),
+  lid: text("lid").notNull(),
+  pn: text("pn").notNull(),
+  description: text("description"),
+});
+
+export const groupTable = sqliteTable("group", {
+  id: text("id").primaryKey(),
+  whatsappId: text("whatsapp_id")
+    .notNull()
+    .references(() => whatsappTable.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  pushName: text("push_name").notNull(),
+  gid: text("gid").notNull(),
+  description: text("description"),
 });
 
 export const connectionTable = sqliteTable("connection", {
