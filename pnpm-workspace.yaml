@@ -1,4 +1,6 @@
 onlyBuiltDependencies:
+  - baileys
   - esbuild
+  - protobufjs
   - sharp
   - unrs-resolver
