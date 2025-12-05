@@ -41,4 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 *.dbwhatsapp_sessions/
+whatsapp_sessions/
+whatsapp_sessions/*
 *.db
