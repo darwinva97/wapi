@@ -6,12 +6,14 @@ import makeWASocket, {
   WASocket,
 } from "baileys";
 import { db } from "@/db";
-import { whatsappTable, connectionTable } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { whatsappTable, connectionTable, contactTable, groupTable } from "@/db/schema";
+import { eq, and, or } from "drizzle-orm";
 import pino from "pino";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { EventEmitter } from "events";
+import { normalizeContactData, getBestContactName, isGroup, extractLidAndPn, isOwnContact, isOwnChat } from "./whatsapp-utils";
 
 export const whatsappEvents = new EventEmitter();
 
@@ -60,6 +62,133 @@ export async function connectToWhatsApp(whatsappId: string) {
   sessions.set(whatsappId, sock);
 
   sock.ev.on("creds.update", saveCreds);
+
+  sock.ev.on("contacts.upsert", async (contacts) => {
+    const user = sock.user;
+    const phoneNumber = user?.id?.split(":")[0] || user?.id?.split("@")[0];
+
+    for (const contact of contacts) {
+      const normalized = normalizeContactData(contact);
+      
+      if (isOwnContact(normalized.lid, normalized.pn, phoneNumber || "")) continue;
+
+      if (normalized.lid || normalized.pn) {
+        // Check if exists
+        let existing;
+        
+        if (normalized.lid) {
+          existing = await db.query.contactTable.findFirst({
+            where: and(
+              eq(contactTable.whatsappId, whatsappId),
+              eq(contactTable.lid, normalized.lid)
+            )
+          });
+        } else if (normalized.pn) {
+          existing = await db.query.contactTable.findFirst({
+            where: and(
+              eq(contactTable.whatsappId, whatsappId),
+              eq(contactTable.pn, normalized.pn)
+            )
+          });
+        }
+
+        if (!existing) {
+           // Insert
+           const pushName = normalized.pn || normalized.notifyName || normalized.verifiedName || normalized.lid || 'Unknown';
+           try {
+             await db.insert(contactTable).values({
+               id: crypto.randomUUID(),
+               whatsappId,
+               name: normalized.contactName || pushName, // Use pushName as fallback for name
+               pushName,
+               lid: normalized.lid || "", 
+               pn: normalized.pn || "", 
+               description: "",
+             });
+           } catch (e) {
+             console.error("Error inserting contact:", e);
+           }
+        } else {
+           // Update
+           if (normalized.contactName) {
+             try {
+               await db.update(contactTable)
+                 .set({ name: normalized.contactName })
+                 .where(eq(contactTable.id, existing.id));
+             } catch (e) {
+               console.error("Error updating contact:", e);
+             }
+           }
+        }
+      }
+    }
+  });
+
+  sock.ev.on("chats.upsert", async (chats) => {
+    const user = sock.user;
+    const phoneNumber = user?.id?.split(":")[0] || user?.id?.split("@")[0];
+
+    for (const chat of chats) {
+      if (!chat.id || chat.id.includes("@broadcast")) continue;
+      if (isOwnChat(chat.id, phoneNumber || "")) continue;
+
+      if (isGroup(chat.id)) {
+        // Group logic
+        const existing = await db.query.groupTable.findFirst({
+          where: and(
+            eq(groupTable.whatsappId, whatsappId),
+            eq(groupTable.gid, chat.id)
+          )
+        });
+
+        if (!existing) {
+           try {
+             const metadata = await sock.groupMetadata(chat.id);
+             await db.insert(groupTable).values({
+               id: crypto.randomUUID(),
+               whatsappId,
+               gid: chat.id,
+               name: metadata.subject || chat.name || "Unknown Group",
+               pushName: metadata.subject || chat.name || "Unknown Group",
+               description: metadata.desc || "",
+             });
+           } catch (e) {
+             console.error("Error fetching group metadata or inserting group:", e);
+           }
+        }
+      } else {
+        // Contact logic (update pushName if exists)
+        const { lid, pn } = extractLidAndPn(chat.id);
+        
+        let existing;
+        if (lid && !lid.includes("unknown")) {
+          existing = await db.query.contactTable.findFirst({
+            where: and(
+              eq(contactTable.whatsappId, whatsappId),
+              eq(contactTable.lid, lid)
+            )
+          });
+        } else if (pn && !pn.includes("unknown")) {
+          existing = await db.query.contactTable.findFirst({
+            where: and(
+              eq(contactTable.whatsappId, whatsappId),
+              eq(contactTable.pn, pn)
+            )
+          });
+        }
+
+        if (existing && chat.name) {
+          try {
+            await db.update(contactTable)
+              .set({ pushName: chat.name })
+              .where(eq(contactTable.id, existing.id));
+          } catch (e) {
+            console.error("Error updating contact pushName:", e);
+          }
+        }
+      }
+    }
+  });
 
   sock.ev.on("messages.upsert", async (m) => {
     if (m.type !== "notify") return;
