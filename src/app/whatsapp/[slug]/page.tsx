@@ -9,10 +9,10 @@ import { ConnectButton } from "./connect-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Plus, Edit } from "lucide-react";
+import { Suspense } from "react";
 
-export default async function WhatsappDetailView({
+async function WhatsappDetailView({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -145,4 +145,14 @@ export default async function WhatsappDetailView({
       </div>
     </div>
   );
+}
+
+export default async function WhatsappDetail({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  return <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+    <WhatsappDetailView params={params} />
+  </Suspense>;
 }

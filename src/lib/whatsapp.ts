@@ -49,7 +49,7 @@ export async function connectToWhatsApp(whatsappId: string) {
   const sock = makeWASocket({
     version,
     logger: pino({ level: "silent" }) as any,
-    printQRInTerminal: true, // Useful for dev logs
+    printQRInTerminal: false, // Deprecated and causes warnings
     auth: {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" }) as any),

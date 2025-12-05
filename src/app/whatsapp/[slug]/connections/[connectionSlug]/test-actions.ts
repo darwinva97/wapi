@@ -6,6 +6,7 @@ import { whatsappTable, connectionTable } from "@/db/schema";
 import { headers } from "next/headers";
 import { eq, and } from "drizzle-orm";
 import { getSocket } from "@/lib/whatsapp";
+import { revalidatePath } from "next/cache";
 
 export async function testSenderAction(connectionId: string, to: string, message: string) {
   const session = await auth.api.getSession({
@@ -44,6 +45,12 @@ export async function testSenderAction(connectionId: string, to: string, message
 
   const sock = getSocket(wa.id);
   if (!sock) {
+    if (wa.connected) {
+      await db.update(whatsappTable)
+        .set({ connected: false })
+        .where(eq(whatsappTable.id, wa.id));
+      revalidatePath(`/whatsapp/${wa.slug}`, 'layout');
+    }
     return { success: false, error: "WhatsApp is not connected" };
   }
 
@@ -113,7 +120,7 @@ export async function testReceiverAction(connectionId: string) {
     ],
     type: "notify"
   };
-
+  console.log("Testing Receiver with payload:", mockPayload, config.url);
   try {
     const response = await fetch(config.url, {
       method: "POST",
