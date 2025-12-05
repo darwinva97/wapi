@@ -5,8 +5,15 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { eq, and } from "drizzle-orm";
 import Link from "next/link";
+import { TestConnection } from "./test-connection";
+import { Suspense } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, Edit } from "lucide-react";
 
-export default async function ConnectionDetailView({
+async function ConnectionDetailView({
   params,
 }: {
   params: Promise<{ slug: string; connectionSlug: string }>;
@@ -43,93 +50,101 @@ export default async function ConnectionDetailView({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center gap-4">
-          <Link href={`/whatsapp/${wa.slug}`} className="text-gray-500 hover:text-gray-700">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            {connection.name}
-          </h1>
-          <div className="flex gap-2">
-             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${connection.receiverEnabled ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
-              Receiver: {connection.receiverEnabled ? 'ON' : 'OFF'}
-            </span>
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${connection.senderEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-              Sender: {connection.senderEnabled ? 'ON' : 'OFF'}
-            </span>
-          </div>
-        </div>
-      </header>
-      <main>
-        <div className="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg leading-6 font-medium text-gray-900">Detalles de la Conexión</h3>
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">Configuración y credenciales.</p>
-              </div>
-              <div>
-                <Link
-                  href={`/whatsapp/${wa.slug}/connections/${connection.slug}/edit`}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Editar
-                </Link>
-              </div>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild>
+              <Link href={`/whatsapp/${wa.slug}`}>
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+              {connection.name}
+            </h1>
+            <div className="flex gap-2">
+              <Badge variant={connection.receiverEnabled ? 'default' : 'secondary'}>
+                Receiver: {connection.receiverEnabled ? 'ON' : 'OFF'}
+              </Badge>
+              <Badge variant={connection.senderEnabled ? 'default' : 'secondary'}>
+                Sender: {connection.senderEnabled ? 'ON' : 'OFF'}
+              </Badge>
             </div>
-            <div className="border-t border-gray-200">
-              <dl>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Nombre</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{connection.name}</dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Slug</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{connection.slug}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Descripción</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{connection.description || '-'}</dd>
-                </div>
-                
-                {connection.senderEnabled && (
-                  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Sender Token</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 font-mono break-all">
-                      {connection.senderToken}
-                    </dd>
-                  </div>
-                )}
+          </div>
+          <Button asChild>
+            <Link href={`/whatsapp/${wa.slug}/connections/${connection.slug}/edit`}>
+              <Edit className="mr-2 h-4 w-4" /> Editar
+            </Link>
+          </Button>
+        </div>
 
-                {connection.receiverEnabled && (
-                   <>
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Receiver Request Config</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        <pre className="whitespace-pre-wrap font-mono text-xs bg-gray-100 p-2 rounded">
-                          {connection.receiverRequest ? JSON.stringify(connection.receiverRequest, null, 2) : 'No configurado'}
-                        </pre>
-                      </dd>
-                    </div>
-                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Receiver Filter</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                         <pre className="whitespace-pre-wrap font-mono text-xs bg-gray-100 p-2 rounded">
-                          {connection.receiverFilter ? JSON.stringify(connection.receiverFilter, null, 2) : 'No configurado'}
-                        </pre>
-                      </dd>
-                    </div>
-                   </>
-                )}
-              </dl>
+        <Card>
+          <CardHeader>
+            <CardTitle>Detalles de la Conexión</CardTitle>
+            <CardDescription>Configuración y credenciales.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <div className="text-sm font-medium">Nombre</div>
+                <div className="mt-1 text-sm">{connection.name}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium">Slug</div>
+                <div className="mt-1 text-sm">{connection.slug}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium">Descripción</div>
+                <div className="mt-1 text-sm">{connection.description || '-'}</div>
+              </div>
             </div>
-          </div>
-        </div>
-      </main>
+
+            {connection.senderEnabled && (
+              <>
+                <Separator />
+                <div>
+                  <div className="text-sm font-medium">Sender Token</div>
+                  <div className="mt-1 text-sm font-mono bg-muted p-2 rounded break-all">
+                    {connection.senderToken}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {connection.receiverEnabled && (
+              <>
+                <Separator />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <div className="text-sm font-medium">Receiver Request Config</div>
+                    <pre className="mt-1 text-xs font-mono bg-muted p-2 rounded whitespace-pre-wrap">
+                      {connection.receiverRequest ? JSON.stringify(connection.receiverRequest, null, 2) : 'No configurado'}
+                    </pre>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium">Receiver Filter</div>
+                    <pre className="mt-1 text-xs font-mono bg-muted p-2 rounded whitespace-pre-wrap">
+                      {connection.receiverFilter ? JSON.stringify(connection.receiverFilter, null, 2) : 'No configurado'}
+                    </pre>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <TestConnection connection={connection} />
+      </div>
     </div>
   );
+}
+
+export default async function ConnectionDetail({
+  params,
+}: {
+  params: Promise<{ slug: string; connectionSlug: string }>;
+}) {
+  return <Suspense fallback={<div>Loading...</div>}>
+    <ConnectionDetailView params={params} />
+  </Suspense>;
 }

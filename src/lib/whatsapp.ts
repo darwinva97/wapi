@@ -6,8 +6,8 @@ import makeWASocket, {
   WASocket,
 } from "baileys";
 import { db } from "@/db";
-import { whatsappTable } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { whatsappTable, connectionTable } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import pino from "pino";
 import fs from "fs";
 import path from "path";
@@ -60,6 +60,41 @@ export async function connectToWhatsApp(whatsappId: string) {
   sessions.set(whatsappId, sock);
 
   sock.ev.on("creds.update", saveCreds);
+
+  sock.ev.on("messages.upsert", async (m) => {
+    if (m.type !== "notify") return;
+
+    try {
+      const connections = await db.query.connectionTable.findMany({
+        where: and(
+          eq(connectionTable.whatsappId, whatsappId),
+          eq(connectionTable.receiverEnabled, true)
+        ),
+      });
+
+      for (const connection of connections) {
+        if (!connection.receiverRequest) continue;
+
+        const config = connection.receiverRequest as { url: string; headers?: Record<string, string> };
+        if (!config.url) continue;
+
+        try {
+          await fetch(config.url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...config.headers,
+            },
+            body: JSON.stringify(m),
+          });
+        } catch (err) {
+          console.error(`Error sending webhook for connection ${connection.slug}:`, err);
+        }
+      }
+    } catch (err) {
+      console.error("Error processing messages.upsert:", err);
+    }
+  });
 
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;

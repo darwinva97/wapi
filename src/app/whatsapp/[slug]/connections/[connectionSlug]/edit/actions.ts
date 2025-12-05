@@ -23,6 +23,28 @@ export async function updateConnectionAction(id: string, formData: FormData) {
   const description = formData.get("description") as string;
   const receiverEnabled = formData.get("receiverEnabled") === "on";
   const senderEnabled = formData.get("senderEnabled") === "on";
+  
+  const receiverRequestStr = formData.get("receiverRequest") as string;
+  const receiverFilterStr = formData.get("receiverFilter") as string;
+
+  let receiverRequest = null;
+  let receiverFilter = null;
+
+  if (receiverRequestStr && receiverRequestStr.trim() !== "") {
+    try {
+      receiverRequest = JSON.parse(receiverRequestStr);
+    } catch (e) {
+      throw new Error("Invalid JSON for Receiver Request Config");
+    }
+  }
+
+  if (receiverFilterStr && receiverFilterStr.trim() !== "") {
+    try {
+      receiverFilter = JSON.parse(receiverFilterStr);
+    } catch (e) {
+      throw new Error("Invalid JSON for Receiver Filter");
+    }
+  }
 
   if (!whatsappSlug || !name || !slug) {
     throw new Error("Missing required fields");
@@ -76,6 +98,8 @@ export async function updateConnectionAction(id: string, formData: FormData) {
       slug,
       description,
       receiverEnabled,
+      receiverRequest,
+      receiverFilter,
       senderEnabled,
       senderToken,
     })

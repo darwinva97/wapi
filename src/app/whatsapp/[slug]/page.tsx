@@ -6,6 +6,11 @@ import { notFound, redirect } from "next/navigation";
 import { eq, and } from "drizzle-orm";
 import Link from "next/link";
 import { ConnectButton } from "./connect-button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, Plus, Edit } from "lucide-react";
 
 export default async function WhatsappDetailView({
   params,
@@ -37,115 +42,107 @@ export default async function WhatsappDetailView({
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 flex items-center gap-4">
-          <Link href="/" className="text-gray-500 hover:text-gray-700">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            {wa.name}
-          </h1>
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${wa.connected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-            {wa.connected ? 'Conectado' : 'Desconectado'}
-          </span>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+              {wa.name}
+            </h1>
+            <Badge variant={wa.connected ? 'default' : 'destructive'}>
+              {wa.connected ? 'Conectado' : 'Desconectado'}
+            </Badge>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href={`/whatsapp/${wa.slug}/edit`}>
+                <Edit className="mr-2 h-4 w-4" /> Editar
+              </Link>
+            </Button>
+            <ConnectButton id={wa.id} isConnected={wa.connected} />
+          </div>
         </div>
-      </header>
-      <main>
-        <div className="mx-auto max-w-7xl py-6 sm:px-6 lg:px-8">
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Detalles de la cuenta</CardTitle>
+            <CardDescription>Información y configuración.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <h3 className="text-lg leading-6 font-medium text-gray-900">Detalles de la cuenta</h3>
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">Información y configuración.</p>
+                <div className="text-sm font-medium">Nombre</div>
+                <div className="mt-1 text-sm">{wa.name}</div>
               </div>
-              <div className="flex gap-2">
-                <Link
-                  href={`/whatsapp/${wa.slug}/edit`}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Editar
-                </Link>
-                <ConnectButton id={wa.id} isConnected={wa.connected} />
+              <div>
+                <div className="text-sm font-medium">Slug</div>
+                <div className="mt-1 text-sm">{wa.slug}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium">Número de teléfono</div>
+                <div className="mt-1 text-sm">{wa.phoneNumber}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium">Descripción</div>
+                <div className="mt-1 text-sm">{wa.description || '-'}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium">Estado</div>
+                <div className="mt-1 text-sm">{wa.enabled ? 'Habilitado' : 'Deshabilitado'}</div>
               </div>
             </div>
-            <div className="border-t border-gray-200">
-              <dl>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Nombre</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{wa.name}</dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Slug</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{wa.slug}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Número de teléfono</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{wa.phoneNumber}</dd>
-                </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Descripción</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{wa.description || '-'}</dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Estado</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {wa.enabled ? 'Habilitado' : 'Deshabilitado'}
-                  </dd>
-                </div>
-              </dl>
-            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold tracking-tight">Conexiones</h2>
+            <Button asChild>
+              <Link href={`/whatsapp/${wa.slug}/connections/create`}>
+                <Plus className="mr-2 h-4 w-4" /> Agregar
+              </Link>
+            </Button>
           </div>
 
-          {/* Connections Section */}
-          <div className="mt-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium text-gray-900">Conexiones</h2>
-              <Link
-                href={`/whatsapp/${wa.slug}/connections/create`}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Agregar
-              </Link>
-            </div>
-            <div className="bg-white shadow overflow-hidden sm:rounded-md">
-              <ul role="list" className="divide-y divide-gray-200">
-                {connections.length === 0 ? (
-                  <li className="px-4 py-4 sm:px-6 text-center text-gray-500">
-                    No hay conexiones creadas.
-                  </li>
-                ) : (
-                  connections.map((connection) => (
-                    <li key={connection.id}>
-                      <Link href={`/whatsapp/${wa.slug}/connections/${connection.slug}`} className="block hover:bg-gray-50">
-                        <div className="px-4 py-4 sm:px-6">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-blue-600 truncate">{connection.name}</p>
-                            <div className="ml-2 flex-shrink-0 flex">
-                              <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${connection.senderEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                {connection.senderEnabled ? 'Sender Activo' : 'Sender Inactivo'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="mt-2 sm:flex sm:justify-between">
-                            <div className="sm:flex">
-                              <p className="flex items-center text-sm text-gray-500">
-                                {connection.description || 'Sin descripción'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    </li>
-                  ))
-                )}
-              </ul>
-            </div>
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              {connections.length === 0 ? (
+                <div className="p-6 text-center">
+                  No hay conexiones creadas.
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {connections.map((connection) => (
+                    <Link
+                      key={connection.id}
+                      href={`/whatsapp/${wa.slug}/connections/${connection.slug}`}
+                      className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                    >
+                      <div>
+                        <div className="font-medium text-blue-600">{connection.name}</div>
+                        <div className="text-sm">{connection.description || 'Sin descripción'}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={connection.senderEnabled ? 'outline' : 'secondary'}>
+                          {connection.senderEnabled ? 'Sender Activo' : 'Sender Inactivo'}
+                        </Badge>
+                        <Badge variant={connection.receiverEnabled ? 'outline' : 'secondary'}>
+                          {connection.receiverEnabled ? 'Receiver Activo' : 'Receiver Inactivo'}
+                        </Badge>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
