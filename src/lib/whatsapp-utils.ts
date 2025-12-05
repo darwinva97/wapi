@@ -1,4 +1,15 @@
-import type { Contact } from "baileys";
+import type { Contact, proto } from "baileys";
+
+export function extractMessageText(message: proto.IMessage | null | undefined): string {
+  if (!message) return "";
+  return (
+    message.conversation ||
+    message.extendedTextMessage?.text ||
+    message.imageMessage?.caption ||
+    message.videoMessage?.caption ||
+    ""
+  );
+}
 
 export interface NormalizedContactData {
   id: string;

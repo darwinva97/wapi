@@ -53,3 +53,17 @@ export const connectionTable = sqliteTable("connection", {
   senderEnabled: integer("sender_enabled", { mode: 'boolean' }).notNull(),
   senderToken: text("sender_token"),
 });
+
+export const messageTable = sqliteTable("message", {
+  id: text("id").primaryKey(),
+  whatsappId: text("whatsapp_id")
+    .notNull()
+    .references(() => whatsappTable.id, { onDelete: "cascade" }),
+  chatId: text("chat_id").notNull(),
+  chatType: text("chat_type").notNull(), // 'group' | 'personal'
+  senderId: text("sender_id").notNull(),
+  content: text("content", { mode: 'json' }),
+  body: text("body"),
+  timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
+  fromMe: integer("from_me", { mode: 'boolean' }).notNull(),
+});

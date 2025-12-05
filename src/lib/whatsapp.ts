@@ -6,16 +6,19 @@ import makeWASocket, {
   WASocket,
 } from "baileys";
 import { db } from "@/db";
-import { whatsappTable, connectionTable, contactTable, groupTable } from "@/db/schema";
+import { whatsappTable, connectionTable, contactTable, groupTable, messageTable } from "@/db/schema";
 import { eq, and, or } from "drizzle-orm";
 import pino from "pino";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { EventEmitter } from "events";
-import { normalizeContactData, getBestContactName, isGroup, extractLidAndPn, isOwnContact, isOwnChat } from "./whatsapp-utils";
+import { normalizeContactData, getBestContactName, isGroup, extractLidAndPn, isOwnContact, isOwnChat, extractMessageText } from "./whatsapp-utils";
 
-export const whatsappEvents = new EventEmitter();
+export const whatsappEvents = (global as any).whatsappEvents || new EventEmitter();
+if (process.env.NODE_ENV !== "production") {
+  (global as any).whatsappEvents = whatsappEvents;
+}
 
 // Global map to store active connections
 // In a production environment with multiple instances, this needs Redis or similar.
@@ -191,6 +194,44 @@ export async function connectToWhatsApp(whatsappId: string) {
   });
 
   sock.ev.on("messages.upsert", async (m) => {
+    // Save messages to DB
+    try {
+      for (const msg of m.messages) {
+        if (!msg.key.remoteJid) continue;
+        
+        const body = extractMessageText(msg.message);
+
+        const isGroupChat = isGroup(msg.key.remoteJid);
+
+        const timestamp = typeof msg.messageTimestamp === 'number' 
+          ? new Date(msg.messageTimestamp * 1000)
+          : new Date((msg.messageTimestamp as any)?.toNumber?.() * 1000 || Date.now());
+
+        await db.insert(messageTable).values({
+          id: msg.key.id || crypto.randomUUID(),
+          whatsappId,
+          chatId: msg.key.remoteJid,
+          chatType: isGroupChat ? 'group' : 'personal',
+          senderId: msg.key.participant || msg.key.remoteJid,
+          content: msg,
+          body: body,
+          timestamp: timestamp,
+          fromMe: msg.key.fromMe || false,
+        }).onConflictDoNothing();
+
+        // Emit event for real-time updates
+        whatsappEvents.emit(`new-message-${msg.key.remoteJid}`, {
+          id: msg.key.id,
+          body,
+          timestamp: timestamp,
+          fromMe: msg.key.fromMe || false,
+          senderId: msg.key.participant || msg.key.remoteJid,
+        });
+      }
+    } catch (e) {
+      console.error("Error saving messages to DB:", e);
+    }
+
     if (m.type !== "notify") return;
 
     try {
