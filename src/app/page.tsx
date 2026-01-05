@@ -5,8 +5,9 @@ import { db } from "@/db";
 import { whatsappTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
+import { Suspense } from "react";
 
-export default async function Dashboard() {
+async function Dashboard() {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -88,12 +89,12 @@ export default async function Dashboard() {
                     </Link>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                     <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${wa.connected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                        {wa.connected ? 'Online' : 'Offline'}
-                     </span>
-                     <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${wa.enabled ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
-                        {wa.enabled ? 'Activo' : 'Inactivo'}
-                     </span>
+                    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${wa.connected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      {wa.connected ? 'Online' : 'Offline'}
+                    </span>
+                    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${wa.enabled ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+                      {wa.enabled ? 'Activo' : 'Inactivo'}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -103,4 +104,10 @@ export default async function Dashboard() {
       </main>
     </div>
   );
+}
+
+export default function DashboardPage() {
+  return <Suspense fallback={<div>Cargando...</div>}>
+    <Dashboard />
+  </Suspense>;
 }

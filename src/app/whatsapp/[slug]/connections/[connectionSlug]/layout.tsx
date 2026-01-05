@@ -7,7 +7,7 @@ import { eq, and } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Users, MessageSquare } from "lucide-react";
+import { ArrowLeft, Edit } from "lucide-react";
 import { Suspense } from "react";
 
 async function ConnectionLayout({
@@ -71,16 +71,6 @@ async function ConnectionLayout({
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link href={`/whatsapp/${wa.slug}/connections/${connection.slug}/chats`}>
-                <MessageSquare className="mr-2 h-4 w-4" /> Chats
-              </Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href={`/whatsapp/${wa.slug}/connections/${connection.slug}/contacts`}>
-                <Users className="mr-2 h-4 w-4" /> Contacts
-              </Link>
-            </Button>
             <Button asChild>
               <Link href={`/whatsapp/${wa.slug}/connections/${connection.slug}/edit`}>
                 <Edit className="mr-2 h-4 w-4" /> Editar
