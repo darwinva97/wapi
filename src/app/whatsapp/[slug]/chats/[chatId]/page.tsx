@@ -62,8 +62,8 @@ export default async function ChatPage({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      <div className="p-4 border-b bg-background shrink-0">
         <h3 className="font-semibold">{chatName}</h3>
         <p className="text-xs text-muted-foreground font-mono">{decodedChatId}</p>
       </div>

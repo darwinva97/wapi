@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -21,11 +21,31 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const initialMessageIds = useMemo(() => initialMessages.map(m => m.id).join(','), [initialMessages]);
 
-  // Sync state with initialMessages when they change (e.g. after revalidatePath)
+  // Sync state with initialMessages only when message IDs actually change
   useEffect(() => {
-    setMessages(initialMessages);
-  }, [initialMessages]);
+    setMessages(prev => {
+      // Merge: keep SSE messages that aren't in initialMessages yet, add new ones from initialMessages
+      const existingIds = new Set(prev.map(m => m.id));
+      const newFromServer = initialMessages.filter(m => !existingIds.has(m.id));
+      
+      if (newFromServer.length === 0 && prev.length >= initialMessages.length) {
+        // No new messages from server, keep current state (preserves SSE messages)
+        return prev;
+      }
+      
+      // Merge all unique messages and sort by timestamp
+      const allIds = new Set<string>();
+      const merged = [...prev, ...initialMessages].filter(m => {
+        if (allIds.has(m.id)) return false;
+        allIds.add(m.id);
+        return true;
+      });
+      
+      return merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    });
+  }, [initialMessageIds, initialMessages]);
 
   useEffect(() => {
     // Scroll to bottom on initial load
@@ -74,7 +94,7 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
   }, [chatId]);
 
   return (
-    <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+    <ScrollArea className="flex-1 min-h-0 overflow-auto p-4" ref={scrollRef}>
       <div className="flex flex-col gap-4">
         {messages.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">
@@ -92,7 +112,7 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
               )}
             >
               {msg.body || <span className="italic opacity-50">Media/Mensaje del sistema</span>}
-              <span className="text-[10px] opacity-70 self-end">
+              <span className="text-[10px] opacity-70 self-end" suppressHydrationWarning>
                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
