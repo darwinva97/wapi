@@ -69,7 +69,7 @@ async function WhatsappDetailView({
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
+      <div className="space-y-4 mt-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold tracking-tight">Conexiones</h2>
           <Button asChild>

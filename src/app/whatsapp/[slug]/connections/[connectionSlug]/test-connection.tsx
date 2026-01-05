@@ -9,14 +9,39 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Copy, Check } from "lucide-react";
 
 interface Connection {
   id: string;
   senderEnabled: boolean;
+  senderToken: string | null;
   receiverEnabled: boolean;
 }
 
-export function TestConnection({ connection }: { connection: Connection }) {
+interface TestConnectionProps {
+  connection: Connection;
+  whatsappSlug: string;
+  connectionSlug: string;
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopy}>
+      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+    </Button>
+  );
+}
+
+export function TestConnection({ connection, whatsappSlug, connectionSlug }: TestConnectionProps) {
   const [senderTo, setSenderTo] = useState("");
   const [senderMsg, setSenderMsg] = useState("Hola desde WAPI!");
   const [senderLoading, setSenderLoading] = useState(false);
@@ -24,6 +49,39 @@ export function TestConnection({ connection }: { connection: Connection }) {
 
   const [receiverLoading, setReceiverLoading] = useState(false);
   const [receiverResult, setReceiverResult] = useState<any>(null);
+
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://tu-dominio.com';
+  const senderEndpoint = `${baseUrl}/api/${whatsappSlug}/${connectionSlug}/sender`;
+
+  const curlExample = `curl -X POST "${senderEndpoint}" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${connection.senderToken || 'TU_TOKEN'}" \\
+  -d '{
+    "to": "51999999999",
+    "message": { "text": "Hola desde WAPI!" }
+  }'`;
+
+  const fetchExample = `fetch("${senderEndpoint}", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer ${connection.senderToken || 'TU_TOKEN'}"
+  },
+  body: JSON.stringify({
+    to: "51999999999",
+    message: { text: "Hola desde WAPI!" }
+  })
+});`;
+
+  const axiosExample = `axios.post("${senderEndpoint}", {
+  to: "51999999999",
+  message: { text: "Hola desde WAPI!" }
+}, {
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer ${connection.senderToken || 'TU_TOKEN'}"
+  }
+});`;
 
   async function handleTestSender(e: React.FormEvent) {
     e.preventDefault();
@@ -107,6 +165,61 @@ export function TestConnection({ connection }: { connection: Connection }) {
                 </Alert>
               )}
             </form>
+
+            <Separator className="my-6" />
+
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium">Ejemplo de Petición HTTP</h4>
+              <p className="text-sm text-muted-foreground">
+                Usa esta petición desde tu aplicación para enviar mensajes vía WhatsApp.
+              </p>
+              
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium">Endpoint:</span>
+                  <code className="text-xs bg-muted px-2 py-1 rounded flex-1 break-all">{senderEndpoint}</code>
+                  <CopyButton text={senderEndpoint} />
+                </div>
+              </div>
+
+              <Tabs defaultValue="curl" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="curl">cURL</TabsTrigger>
+                  <TabsTrigger value="fetch">Fetch</TabsTrigger>
+                  <TabsTrigger value="axios">Axios</TabsTrigger>
+                </TabsList>
+                <TabsContent value="curl" className="relative">
+                  <pre className="text-xs font-mono bg-muted p-4 rounded overflow-x-auto whitespace-pre-wrap">{curlExample}</pre>
+                  <div className="absolute top-2 right-2">
+                    <CopyButton text={curlExample} />
+                  </div>
+                </TabsContent>
+                <TabsContent value="fetch" className="relative">
+                  <pre className="text-xs font-mono bg-muted p-4 rounded overflow-x-auto whitespace-pre-wrap">{fetchExample}</pre>
+                  <div className="absolute top-2 right-2">
+                    <CopyButton text={fetchExample} />
+                  </div>
+                </TabsContent>
+                <TabsContent value="axios" className="relative">
+                  <pre className="text-xs font-mono bg-muted p-4 rounded overflow-x-auto whitespace-pre-wrap">{axiosExample}</pre>
+                  <div className="absolute top-2 right-2">
+                    <CopyButton text={axiosExample} />
+                  </div>
+                </TabsContent>
+              </Tabs>
+
+              <Alert>
+                <AlertTitle>Formato del mensaje</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>El campo <code className="text-xs bg-muted px-1 rounded">message</code> acepta el formato de Baileys. Ejemplos:</p>
+                  <ul className="list-disc list-inside text-xs space-y-1 mt-2">
+                    <li><code className="bg-muted px-1 rounded">{`{ "text": "Hola mundo" }`}</code> - Texto simple</li>
+                    <li><code className="bg-muted px-1 rounded">{`{ "image": { "url": "https://..." }, "caption": "Mi imagen" }`}</code> - Imagen</li>
+                    <li><code className="bg-muted px-1 rounded">{`{ "document": { "url": "https://..." }, "fileName": "doc.pdf" }`}</code> - Documento</li>
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            </div>
           </div>
         )}
 

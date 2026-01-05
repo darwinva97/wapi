@@ -102,7 +102,11 @@ async function ConnectionDetailView({
         </CardContent>
       </Card>
 
-      <TestConnection connection={connection} />
+      <TestConnection 
+        connection={connection} 
+        whatsappSlug={slug}
+        connectionSlug={connectionSlug}
+      />
     </>
   );
 }

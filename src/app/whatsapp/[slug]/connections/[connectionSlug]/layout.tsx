@@ -49,15 +49,16 @@ async function ConnectionLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link href={`/whatsapp/${wa.slug}`}>
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
+    <div className="flex-1 min-h-0 overflow-auto -m-8 -mb-4">
+      <div className="p-8 pb-4">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" asChild>
+                <Link href={`/whatsapp/${wa.slug}`}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">
               {connection.name}
             </h1>
@@ -80,6 +81,7 @@ async function ConnectionLayout({
         </div>
 
         {children}
+        </div>
       </div>
     </div>
   );
