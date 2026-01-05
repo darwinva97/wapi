@@ -42,7 +42,9 @@ async function WhatsappLayout({
 							</Link>
 						</Button>
 						<h1 className="text-3xl font-bold tracking-tight text-gray-900">
-							{wa.name}
+							<Link href={`/whatsapp/${wa.slug}`}>
+								{wa.name}
+							</Link>
 						</h1>
 						<Badge variant={wa.connected ? 'default' : 'destructive'}>
 							{wa.connected ? 'Conectado' : 'Desconectado'}

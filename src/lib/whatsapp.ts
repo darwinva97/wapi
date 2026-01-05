@@ -127,6 +127,73 @@ export async function connectToWhatsApp(whatsappId: string) {
     }
   });
 
+  // Handle groups.upsert event - triggered when groups are added or updated
+  sock.ev.on("groups.upsert", async (groups) => {
+    console.log(`[groups.upsert] Received ${groups.length} groups for ${whatsappId}`);
+    for (const group of groups) {
+      try {
+        const existing = await db.query.groupTable.findFirst({
+          where: and(
+            eq(groupTable.whatsappId, whatsappId),
+            eq(groupTable.gid, group.id)
+          )
+        });
+
+        if (!existing) {
+          await db.insert(groupTable).values({
+            id: crypto.randomUUID(),
+            whatsappId,
+            gid: group.id,
+            name: group.subject || "Unknown Group",
+            pushName: group.subject || "Unknown Group",
+            description: group.desc || "",
+          });
+          console.log(`[groups.upsert] Inserted group: ${group.subject}`);
+        } else {
+          // Update existing group
+          await db.update(groupTable)
+            .set({
+              name: group.subject || existing.name,
+              pushName: group.subject || existing.pushName,
+              description: group.desc || existing.description,
+            })
+            .where(eq(groupTable.id, existing.id));
+          console.log(`[groups.upsert] Updated group: ${group.subject}`);
+        }
+      } catch (e) {
+        console.error("[groups.upsert] Error processing group:", e);
+      }
+    }
+  });
+
+  // Handle groups.update event - triggered when group metadata changes
+  sock.ev.on("groups.update", async (updates) => {
+    console.log(`[groups.update] Received ${updates.length} group updates for ${whatsappId}`);
+    for (const update of updates) {
+      if (!update.id) continue;
+      try {
+        const existing = await db.query.groupTable.findFirst({
+          where: and(
+            eq(groupTable.whatsappId, whatsappId),
+            eq(groupTable.gid, update.id)
+          )
+        });
+
+        if (existing) {
+          await db.update(groupTable)
+            .set({
+              name: update.subject || existing.name,
+              description: update.desc || existing.description,
+            })
+            .where(eq(groupTable.id, existing.id));
+          console.log(`[groups.update] Updated group: ${update.subject || update.id}`);
+        }
+      } catch (e) {
+        console.error("[groups.update] Error updating group:", e);
+      }
+    }
+  });
+
   sock.ev.on("chats.upsert", async (chats) => {
     const user = sock.user;
     const phoneNumber = user?.id?.split(":")[0] || user?.id?.split("@")[0];
@@ -155,6 +222,7 @@ export async function connectToWhatsApp(whatsappId: string) {
                pushName: metadata.subject || chat.name || "Unknown Group",
                description: metadata.desc || "",
              });
+             console.log(`[chats.upsert] Inserted group: ${metadata.subject || chat.name}`);
            } catch (e) {
              console.error("Error fetching group metadata or inserting group:", e);
            }
@@ -313,6 +381,48 @@ export async function connectToWhatsApp(whatsappId: string) {
           .where(eq(whatsappTable.id, whatsappId));
       } catch (e) {
         console.error("Error updating DB on open:", e);
+      }
+
+      // Sync groups on connection open
+      try {
+        console.log(`[connection.open] Syncing groups for ${whatsappId}...`);
+        const participatingGroups = await sock.groupFetchAllParticipating();
+        const groupIds = Object.keys(participatingGroups);
+        console.log(`[connection.open] Found ${groupIds.length} groups`);
+
+        for (const gid of groupIds) {
+          const group = participatingGroups[gid];
+          const existing = await db.query.groupTable.findFirst({
+            where: and(
+              eq(groupTable.whatsappId, whatsappId),
+              eq(groupTable.gid, gid)
+            )
+          });
+
+          if (!existing) {
+            await db.insert(groupTable).values({
+              id: crypto.randomUUID(),
+              whatsappId,
+              gid: gid,
+              name: group.subject || "Unknown Group",
+              pushName: group.subject || "Unknown Group",
+              description: group.desc || "",
+            });
+            console.log(`[connection.open] Inserted group: ${group.subject}`);
+          } else {
+            // Update existing group
+            await db.update(groupTable)
+              .set({
+                name: group.subject || existing.name,
+                pushName: group.subject || existing.pushName,
+                description: group.desc || existing.description,
+              })
+              .where(eq(groupTable.id, existing.id));
+          }
+        }
+        console.log(`[connection.open] Group sync completed for ${whatsappId}`);
+      } catch (e) {
+        console.error("[connection.open] Error syncing groups:", e);
       }
     } else if (connection === "connecting") {
       whatsappEvents.emit(`status-${whatsappId}`, { status: 'connecting' });
