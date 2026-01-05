@@ -124,15 +124,18 @@ export async function testReceiverAction(connectionId: string) {
   try {
     const response = await fetch(config.url, {
       method: "POST",
+      body: JSON.stringify(mockPayload),
+      ...config,
       headers: {
         "Content-Type": "application/json",
         ...config.headers,
       },
-      body: JSON.stringify(mockPayload),
     });
 
     const responseText = await response.text();
     
+    console.log("responseText", responseText);
+
     return { 
       success: response.ok, 
       status: response.status,

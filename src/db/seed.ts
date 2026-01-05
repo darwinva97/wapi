@@ -1,3 +1,4 @@
+import "@dotenvx/dotenvx/config";
 import { auth } from "@/lib/auth";
 
 async function seed() {

@@ -34,9 +34,22 @@ export async function GET(
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
+      let isClosed = false;
 
       const send = (data: any) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        if (isClosed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        } catch (e) {
+          // Controller already closed, ignore
+          isClosed = true;
+        }
+      };
+
+      const cleanup = () => {
+        isClosed = true;
+        whatsappEvents.off(`qr-${id}`, onQr);
+        whatsappEvents.off(`status-${id}`, onStatus);
       };
 
       // Send initial QR if available
@@ -52,9 +65,12 @@ export async function GET(
       const onStatus = (data: { status: string }) => {
          send({ type: 'status', status: data.status });
          if (data.status === 'open') {
-             // Keep stream open for a moment or close it? 
-             // Usually we want to close it so the client knows it's done.
-             controller.close();
+             cleanup();
+             try {
+               controller.close();
+             } catch (e) {
+               // Already closed
+             }
          }
       };
 
@@ -62,8 +78,12 @@ export async function GET(
       whatsappEvents.on(`status-${id}`, onStatus);
 
       req.signal.addEventListener("abort", () => {
-        whatsappEvents.off(`qr-${id}`, onQr);
-        whatsappEvents.off(`status-${id}`, onStatus);
+        cleanup();
+        try {
+          controller.close();
+        } catch (e) {
+          // Already closed
+        }
       });
     },
   });

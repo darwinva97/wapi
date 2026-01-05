@@ -10,8 +10,9 @@ export const config = {
       * - favicon.ico (favicon file)
       * - login (login page)
       * - api/auth (auth routes)
+      * - api/test (test routes)
       */
-    "/((?!_next/static|_next/image|favicon.ico|login|api/auth).*)",
+    "/((?!_next/static|_next/image|favicon.ico|login|api/auth|api/test).*)",
   ],
 };
 

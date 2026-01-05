@@ -7,13 +7,13 @@ import makeWASocket, {
 } from "baileys";
 import { db } from "@/db";
 import { whatsappTable, connectionTable, contactTable, groupTable, messageTable } from "@/db/schema";
-import { eq, and, or } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import pino from "pino";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { EventEmitter } from "events";
-import { normalizeContactData, getBestContactName, isGroup, extractLidAndPn, isOwnContact, isOwnChat, extractMessageText } from "./whatsapp-utils";
+import { normalizeContactData, isGroup, extractLidAndPn, isOwnContact, isOwnChat, extractMessageText } from "./whatsapp-utils";
 
 export const whatsappEvents = (global as any).whatsappEvents || new EventEmitter();
 if (process.env.NODE_ENV !== "production") {
@@ -241,11 +241,12 @@ export async function connectToWhatsApp(whatsappId: string) {
           eq(connectionTable.receiverEnabled, true)
         ),
       });
-
+      console.log(connections);
       for (const connection of connections) {
         if (!connection.receiverRequest) continue;
 
         const config = connection.receiverRequest as { url: string; headers?: Record<string, string> };
+        console.log(config);
         if (!config.url) continue;
 
         try {
