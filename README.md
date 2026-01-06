@@ -206,10 +206,42 @@ src/
 | `pnpm db:seed` | Crea el usuario admin |
 | `pnpm lint` | Ejecuta ESLint |
 
+## �️ Roadmap
+
+Consulta el [CHANGELOG.md](CHANGELOG.md) para ver las características planeadas. Algunas de las próximas mejoras incluyen:
+
+### Receiver Filter Avanzado
+El filtro de receiver actual solo soporta JSON estático. Próximamente:
+
+- **Evaluación JavaScript**: Escribir funciones JS que evalúen mensajes
+  ```javascript
+  (msg) => !msg.key.fromMe && msg.message?.conversation?.includes("pedido")
+  ```
+
+- **Plantillas HTTP**: Validar mensajes contra una API externa antes de enviar el webhook
+  ```json
+  {
+    "type": "http",
+    "url": "https://mi-api.com/validate",
+    "expectStatus": 200
+  }
+  ```
+
+### Otras Mejoras Planeadas
+- 📊 Métricas y estadísticas de uso
+- 🔄 Retry automático de webhooks fallidos
+- 📝 Templates de mensajes reutilizables
+- 🔗 Transformadores de payload personalizados
+- ⏰ Mensajes programados
+- 🔐 Seguridad avanzada (HMAC, IP whitelist)
+- 🤖 Integraciones nativas (n8n, Zapier)
+- 💬 Respuestas automáticas configurables
+
 ## 📚 Documentación Adicional
 
 - [API de Administración](docs/ADMIN_API.md)
 - [Database Seeding](docs/SEEDING.md)
+- [Changelog](CHANGELOG.md)
 
 ## 📝 Licencia
 
