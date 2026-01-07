@@ -12,7 +12,7 @@ interface Message {
   senderId: string;
   messageType?: string;
   mediaUrl?: string | null;
-  mediaMetadata?: any;
+  mediaMetadata?: Record<string, unknown>;
   ackStatus?: number;
   fileName?: string | null;
   isAckUpdate?: boolean;
@@ -129,6 +129,7 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
               )}
             >
               {/* Media Preview */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               {msg.messageType === 'image' && msg.mediaUrl && (
                 <img 
                   src={msg.mediaUrl} 
@@ -146,6 +147,7 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
               {msg.messageType === 'audio' && msg.mediaUrl && (
                 <audio src={msg.mediaUrl} controls className="w-full" />
               )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               {msg.messageType === 'sticker' && msg.mediaUrl && (
                 <img 
                   src={msg.mediaUrl} 

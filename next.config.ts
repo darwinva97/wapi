@@ -4,6 +4,7 @@ import path from "path";
 const nextConfig: NextConfig = {
   reactCompiler: true,
   cacheComponents: true,
+  serverExternalPackages: ['baileys', 'pino', 'thread-stream'],
   experimental: {
     turbopackFileSystemCacheForDev: true,
   },
