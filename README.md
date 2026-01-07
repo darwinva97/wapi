@@ -40,6 +40,9 @@ Cada cuenta de WhatsApp puede tener múltiples "conexiones", que son integracion
 - Visualización de chats y mensajes
 - Actualizaciones via Server-Sent Events (SSE)
 - Historial de mensajes almacenado en base de datos
+- **Soporte multimedia completo**: imágenes, videos, audio, stickers y documentos
+- **Tracking de estados de entrega**: pendiente, enviado, entregado y leído
+- Almacenamiento de archivos multimedia en el servidor
 
 ## 🛠️ Stack Tecnológico
 
@@ -94,7 +97,15 @@ NODE_ENV=development
 pnpm db:push
 ```
 
-### 4. Crear usuario administrador
+### 4. Crear carpeta para archivos multimedia
+
+```bash
+mkdir -p public/media
+```
+
+La carpeta `public/media` almacenará los archivos multimedia (imágenes, videos, audio, documentos) recibidos en los mensajes. Los archivos se organizan por cuenta de WhatsApp y fecha.
+
+### 5. Crear usuario administrador
 
 ```bash
 pnpm db:seed
@@ -120,6 +131,37 @@ Abre [http://localhost:3000](http://localhost:3000)
 2. Crea una nueva cuenta de WhatsApp
 3. Escanea el código QR con tu teléfono
 4. ¡Listo! La cuenta está conectada
+
+### Mensajes Multimedia
+
+El sistema soporta los siguientes tipos de mensajes:
+
+- **Texto**: Mensajes de texto estándar
+- **Imágenes**: JPG, PNG, WebP (se muestran en el chat)
+- **Videos**: MP4, MKV, etc. (reproductor integrado)
+- **Audio**: OGG, MP3, etc. (reproductor de audio)
+- **Stickers**: Stickers de WhatsApp
+- **Documentos**: PDF, DOCX, etc. (enlace de descarga)
+
+Los archivos multimedia se almacenan en `public/media/{whatsapp_id}/{YYYY-MM-DD}/{message_id}_{filename}` y son accesibles vía URL pública.
+
+#### Estados de Entrega (ackStatus)
+
+Cada mensaje tiene un estado de entrega que se actualiza en tiempo real:
+
+- **0**: Pendiente (⏱) - El mensaje está en cola o falló
+- **1**: Enviado (✓) - El mensaje fue enviado al servidor de WhatsApp
+- **2**: Entregado (✓✓) - El mensaje fue entregado al destinatario
+- **3**: Leído (✓✓ azul) - El destinatario leyó el mensaje
+
+Los estados se actualizan automáticamente vía SSE y se reflejan en la interfaz de chat.
+
+### Requisitos de Almacenamiento
+
+- Los archivos multimedia se almacenan en el sistema de archivos del servidor
+- Considera el espacio en disco disponible según el volumen de mensajes multimedia
+- Recomendado: al menos 10 GB libres para uso normal
+- Para producción: considerar una solución de almacenamiento escalable (S3, Cloud Storage, etc.)
 
 ### Crear una conexión (integración)
 

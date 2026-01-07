@@ -66,4 +66,10 @@ export const messageTable = sqliteTable("message", {
   body: text("body"),
   timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
   fromMe: integer("from_me", { mode: 'boolean' }).notNull(),
+  // Media and tracking fields
+  messageType: text("message_type").notNull().default('text'), // 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'document'
+  mediaUrl: text("media_url"), // Public path to media file
+  mediaMetadata: text("media_metadata", { mode: 'json' }), // { mimetype, size, duration, width, height, fileName, sha256 }
+  ackStatus: integer("ack_status", { mode: 'number' }).notNull().default(0), // 0=pending, 1=sent, 2=delivered, 3=read
+  fileName: text("file_name"), // Original filename for documents
 });

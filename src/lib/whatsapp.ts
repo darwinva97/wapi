@@ -4,6 +4,8 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   WASocket,
+  downloadContentFromMessage,
+  proto,
 } from "baileys";
 import { db } from "@/db";
 import { whatsappTable, connectionTable, contactTable, groupTable, messageTable } from "@/db/schema";
@@ -14,6 +16,7 @@ import path from "path";
 import crypto from "crypto";
 import { EventEmitter } from "events";
 import { normalizeContactData, isGroup, extractLidAndPn, isOwnContact, isOwnChat, extractMessageText } from "./whatsapp-utils";
+import { downloadAndSaveMedia, MediaMetadata } from "./media";
 
 // Track sessions that are currently connecting to prevent duplicate connections
 const connectingLocks = new Set<string>();
@@ -72,6 +75,99 @@ const SESSIONS_DIR = "whatsapp_sessions";
 
 if (!fs.existsSync(SESSIONS_DIR)) {
   fs.mkdirSync(SESSIONS_DIR);
+}
+
+// Helper to detect message type and extract metadata
+function detectMessageType(message: proto.IMessage | null | undefined): {
+  type: 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'document';
+  metadata: Partial<MediaMetadata>;
+  messageContent: any;
+} {
+  if (!message) {
+    return { type: 'text', metadata: {}, messageContent: null };
+  }
+
+  if (message.imageMessage) {
+    return {
+      type: 'image',
+      metadata: {
+        mimetype: message.imageMessage.mimetype || undefined,
+        width: message.imageMessage.width || undefined,
+        height: message.imageMessage.height || undefined,
+        fileName: 'image.jpg',
+      },
+      messageContent: message.imageMessage,
+    };
+  }
+
+  if (message.videoMessage) {
+    return {
+      type: 'video',
+      metadata: {
+        mimetype: message.videoMessage.mimetype || undefined,
+        duration: message.videoMessage.seconds || undefined,
+        width: message.videoMessage.width || undefined,
+        height: message.videoMessage.height || undefined,
+        fileName: 'video.mp4',
+      },
+      messageContent: message.videoMessage,
+    };
+  }
+
+  if (message.audioMessage) {
+    return {
+      type: 'audio',
+      metadata: {
+        mimetype: message.audioMessage.mimetype || undefined,
+        duration: message.audioMessage.seconds || undefined,
+        fileName: 'audio.ogg',
+      },
+      messageContent: message.audioMessage,
+    };
+  }
+
+  if (message.stickerMessage) {
+    return {
+      type: 'sticker',
+      metadata: {
+        mimetype: message.stickerMessage.mimetype || undefined,
+        width: message.stickerMessage.width || undefined,
+        height: message.stickerMessage.height || undefined,
+        fileName: 'sticker.webp',
+      },
+      messageContent: message.stickerMessage,
+    };
+  }
+
+  if (message.documentMessage) {
+    return {
+      type: 'document',
+      metadata: {
+        mimetype: message.documentMessage.mimetype || undefined,
+        fileName: message.documentMessage.fileName || 'document',
+      },
+      messageContent: message.documentMessage,
+    };
+  }
+
+  return { type: 'text', metadata: {}, messageContent: null };
+}
+
+// Helper to download media from message
+async function downloadMediaFromMessage(messageContent: any, messageType: string): Promise<Buffer | null> {
+  try {
+    const stream = await downloadContentFromMessage(messageContent, messageType as any);
+    
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    
+    return Buffer.concat(chunks);
+  } catch (error) {
+    console.error("[Media] Error downloading media:", error);
+    return null;
+  }
 }
 
 export async function connectToWhatsApp(whatsappId: string) {
@@ -325,12 +421,53 @@ export async function connectToWhatsApp(whatsappId: string) {
         if (!msg.key.remoteJid) continue;
         
         const body = extractMessageText(msg.message);
-
         const isGroupChat = isGroup(msg.key.remoteJid);
 
         const timestamp = typeof msg.messageTimestamp === 'number' 
           ? new Date(msg.messageTimestamp * 1000)
           : new Date((msg.messageTimestamp as any)?.toNumber?.() * 1000 || Date.now());
+
+        // Detect message type and extract metadata
+        const { type: messageType, metadata, messageContent } = detectMessageType(msg.message);
+        
+        let mediaUrl: string | null = null;
+        let mediaMetadata: any = null;
+        let fileName: string | null = null;
+        
+        // Download and save media if present
+        if (messageType !== 'text' && messageContent) {
+          try {
+            console.log(`[Media] Downloading ${messageType} for message ${msg.key.id}`);
+            
+            const buffer = await downloadMediaFromMessage(messageContent, messageType);
+            
+            if (buffer) {
+              const suggestedFilename = metadata.fileName || `${messageType}_${msg.key.id}`;
+              fileName = metadata.fileName || null;
+              
+              const saveResult = await downloadAndSaveMedia(
+                buffer,
+                suggestedFilename,
+                whatsappId,
+                msg.key.id || crypto.randomUUID(),
+                metadata
+              );
+              
+              mediaUrl = saveResult.url;
+              mediaMetadata = saveResult.metadata;
+              
+              console.log(`[Media] Saved ${messageType} to ${mediaUrl}`);
+            }
+          } catch (mediaError) {
+            console.error(`[Media] Failed to download ${messageType}:`, mediaError);
+            // Store error in metadata but continue
+            mediaMetadata = { ...metadata, error: 'Download failed' };
+          }
+        }
+
+        // Determine initial ackStatus
+        // fromMe messages start as sent (1), incoming messages are delivered (2)
+        const ackStatus = msg.key.fromMe ? 1 : 2;
 
         await db.insert(messageTable).values({
           id: msg.key.id || crypto.randomUUID(),
@@ -342,6 +479,11 @@ export async function connectToWhatsApp(whatsappId: string) {
           body: body,
           timestamp: timestamp,
           fromMe: msg.key.fromMe || false,
+          messageType,
+          mediaUrl,
+          mediaMetadata: mediaMetadata ? JSON.stringify(mediaMetadata) : null,
+          ackStatus,
+          fileName,
         }).onConflictDoNothing();
 
         // Emit event for real-time updates
@@ -351,6 +493,11 @@ export async function connectToWhatsApp(whatsappId: string) {
           timestamp: timestamp,
           fromMe: msg.key.fromMe || false,
           senderId: msg.key.participant || msg.key.remoteJid,
+          messageType,
+          mediaUrl,
+          mediaMetadata,
+          ackStatus,
+          fileName,
         });
       }
     } catch (e: any) {
@@ -400,6 +547,64 @@ export async function connectToWhatsApp(whatsappId: string) {
       }
     } catch (err) {
       console.error("Error processing messages.upsert:", err);
+    }
+  });
+
+  // Handle message status updates (ack: delivery receipts, read receipts)
+  sock.ev.on("messages.update", async (updates) => {
+    try {
+      for (const update of updates) {
+        const { key, update: statusUpdate } = update;
+        
+        if (!key.id || !key.remoteJid) continue;
+        
+        // Map Baileys status to our ackStatus
+        // status: 0 = pending/error, 1 = server ack, 2 = delivered, 3 = read
+        let newAckStatus: number | undefined;
+        
+        if (statusUpdate.status !== undefined) {
+          // Direct status from Baileys
+          if (statusUpdate.status === 0) newAckStatus = 0; // pending/error
+          else if (statusUpdate.status === 1) newAckStatus = 1; // sent
+          else if (statusUpdate.status === 2) newAckStatus = 2; // delivered
+          else if (statusUpdate.status === 3) newAckStatus = 3; // read
+        }
+        
+        // Check for read receipt
+        if (statusUpdate.readTimestamp || (statusUpdate as any).read) {
+          newAckStatus = 3; // read
+        }
+        
+        if (newAckStatus !== undefined) {
+          console.log(`[Ack] Updating message ${key.id} to status ${newAckStatus}`);
+          
+          // Update database
+          await db.update(messageTable)
+            .set({ ackStatus: newAckStatus })
+            .where(
+              and(
+                eq(messageTable.id, key.id),
+                eq(messageTable.whatsappId, whatsappId)
+              )
+            );
+          
+          // Emit SSE event for real-time update
+          whatsappEvents.emit(`message-ack-${key.id}`, {
+            messageId: key.id,
+            chatId: key.remoteJid,
+            ackStatus: newAckStatus,
+          });
+          
+          // Also emit to chat channel for UI updates
+          whatsappEvents.emit(`new-message-${key.remoteJid}`, {
+            id: key.id,
+            ackStatus: newAckStatus,
+            isAckUpdate: true,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("[Ack] Error updating message status:", error);
     }
   });
 
