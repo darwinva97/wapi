@@ -15,6 +15,38 @@ import crypto from "crypto";
 import { EventEmitter } from "events";
 import { normalizeContactData, isGroup, extractLidAndPn, isOwnContact, isOwnChat, extractMessageText } from "./whatsapp-utils";
 
+// Track sessions that are currently connecting to prevent duplicate connections
+const connectingLocks = new Set<string>();
+
+// Helper to clear corrupted session (Bad MAC, decryption errors, etc.)
+function clearCorruptedSession(whatsappId: string): void {
+  const sessionPath = path.join(SESSIONS_DIR, whatsappId);
+  if (fs.existsSync(sessionPath)) {
+    console.log(`[Session] Clearing corrupted session for ${whatsappId}`);
+    fs.rmSync(sessionPath, { recursive: true, force: true });
+  }
+  sessions.delete(whatsappId);
+  qrs.delete(whatsappId);
+  connectingLocks.delete(whatsappId);
+}
+
+// Check if error is a session/encryption error that requires session reset
+function isSessionCorruptionError(error: any): boolean {
+  const errorMessage = error?.message || error?.toString() || "";
+  const corruptionIndicators = [
+    "Bad MAC",
+    "decryption failed",
+    "invalid key",
+    "session not found",
+    "no session",
+    "corrupt",
+    "HMAC",
+  ];
+  return corruptionIndicators.some(indicator => 
+    errorMessage.toLowerCase().includes(indicator.toLowerCase())
+  );
+}
+
 export const whatsappEvents = (global as any).whatsappEvents || new EventEmitter();
 if (process.env.NODE_ENV !== "production") {
   (global as any).whatsappEvents = whatsappEvents;
@@ -43,28 +75,53 @@ if (!fs.existsSync(SESSIONS_DIR)) {
 }
 
 export async function connectToWhatsApp(whatsappId: string) {
+  // Prevent duplicate connections
   if (sessions.has(whatsappId)) {
+    console.log(`[Session] Already connected: ${whatsappId}`);
     return sessions.get(whatsappId);
   }
 
-  const sessionPath = path.join(SESSIONS_DIR, whatsappId);
-  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-  const { version } = await fetchLatestBaileysVersion();
+  // Prevent concurrent connection attempts
+  if (connectingLocks.has(whatsappId)) {
+    console.log(`[Session] Connection already in progress for: ${whatsappId}`);
+    return undefined;
+  }
 
-  const sock = makeWASocket({
-    version,
-    logger: pino({ level: "silent" }) as any,
-    printQRInTerminal: false, // Deprecated and causes warnings
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" }) as any),
-    },
-    generateHighQualityLinkPreview: true,
-  });
+  connectingLocks.add(whatsappId);
 
-  sessions.set(whatsappId, sock);
+  try {
+    const sessionPath = path.join(SESSIONS_DIR, whatsappId);
+    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+    const { version } = await fetchLatestBaileysVersion();
 
-  sock.ev.on("creds.update", saveCreds);
+    const sock = makeWASocket({
+      version,
+      logger: pino({ level: "silent" }) as any,
+      printQRInTerminal: false,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" }) as any),
+      },
+      generateHighQualityLinkPreview: true,
+    });
+
+    sessions.set(whatsappId, sock);
+    connectingLocks.delete(whatsappId);
+
+    // Global error handler for session corruption errors
+    sock.ev.on("error" as any, (error: any) => {
+      console.error(`[Session] Socket error for ${whatsappId}:`, error);
+      if (isSessionCorruptionError(error)) {
+        console.log(`[Session] Detected session corruption, clearing session...`);
+        clearCorruptedSession(whatsappId);
+        whatsappEvents.emit(`status-${whatsappId}`, { 
+          status: 'session_error', 
+          message: 'Session corrupted. Please reconnect and scan QR again.' 
+        });
+      }
+    });
+
+    sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("contacts.upsert", async (contacts) => {
     const user = sock.user;
@@ -296,8 +353,19 @@ export async function connectToWhatsApp(whatsappId: string) {
           senderId: msg.key.participant || msg.key.remoteJid,
         });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error saving messages to DB:", e);
+      
+      // Check for session corruption errors
+      if (isSessionCorruptionError(e)) {
+        console.log(`[Session] Bad MAC error detected during message processing for ${whatsappId}`);
+        clearCorruptedSession(whatsappId);
+        whatsappEvents.emit(`status-${whatsappId}`, { 
+          status: 'session_error', 
+          message: 'Session corrupted during message processing. Please reconnect.' 
+        });
+        return;
+      }
     }
 
     if (m.type !== "notify") return;
@@ -345,8 +413,12 @@ export async function connectToWhatsApp(whatsappId: string) {
     }
 
     if (connection === "close") {
-      const shouldReconnect = (lastDisconnect?.error as any)?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log(`Connection closed for ${whatsappId}. Reconnecting: ${shouldReconnect}`);
+      const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
+      const errorMessage = lastDisconnect?.error?.message || "";
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+      const isSessionCorrupted = isSessionCorruptionError(lastDisconnect?.error);
+      
+      console.log(`Connection closed for ${whatsappId}. Status: ${statusCode}, Error: ${errorMessage}`);
 
       // Update DB
       try {
@@ -359,15 +431,30 @@ export async function connectToWhatsApp(whatsappId: string) {
 
       sessions.delete(whatsappId);
       qrs.delete(whatsappId);
-      whatsappEvents.emit(`status-${whatsappId}`, { status: 'close', shouldReconnect });
+      connectingLocks.delete(whatsappId);
 
-      if (shouldReconnect) {
-        connectToWhatsApp(whatsappId);
+      // Handle session corruption (Bad MAC, decryption errors)
+      if (isSessionCorrupted) {
+        console.log(`[Session] Session corruption detected for ${whatsappId}, clearing session...`);
+        clearCorruptedSession(whatsappId);
+        whatsappEvents.emit(`status-${whatsappId}`, { 
+          status: 'session_error', 
+          message: 'Session corrupted (Bad MAC). Please scan QR code again.',
+          shouldReconnect: true 
+        });
+        // Reconnect after clearing - will require new QR scan
+        setTimeout(() => connectToWhatsApp(whatsappId), 2000);
+        return;
+      }
+
+      whatsappEvents.emit(`status-${whatsappId}`, { status: 'close', shouldReconnect: !isLoggedOut });
+
+      if (!isLoggedOut) {
+        // Reconnect with exponential backoff
+        setTimeout(() => connectToWhatsApp(whatsappId), 3000);
       } else {
-        // Logged out
-        if (fs.existsSync(sessionPath)) {
-          fs.rmSync(sessionPath, { recursive: true, force: true });
-        }
+        // Logged out - clear session
+        clearCorruptedSession(whatsappId);
       }
     } else if (connection === "open") {
       console.log(`Connection opened for ${whatsappId}`);
@@ -430,14 +517,34 @@ export async function connectToWhatsApp(whatsappId: string) {
   });
 
   return sock;
+  } catch (error: any) {
+    console.error(`[Session] Error connecting WhatsApp ${whatsappId}:`, error);
+    connectingLocks.delete(whatsappId);
+    
+    // If it's a session corruption error, clear and allow retry
+    if (isSessionCorruptionError(error)) {
+      clearCorruptedSession(whatsappId);
+      whatsappEvents.emit(`status-${whatsappId}`, { 
+        status: 'session_error', 
+        message: 'Session corrupted during connection. Please try again.' 
+      });
+    }
+    
+    throw error;
+  }
 }
 
 export async function disconnectWhatsApp(whatsappId: string) {
   const sock = sessions.get(whatsappId);
   if (sock) {
-    sock.end(undefined);
+    try {
+      sock.end(undefined);
+    } catch (e) {
+      console.error("Error ending socket:", e);
+    }
     sessions.delete(whatsappId);
     qrs.delete(whatsappId);
+    connectingLocks.delete(whatsappId);
 
     try {
       await db.update(whatsappTable)
@@ -449,10 +556,37 @@ export async function disconnectWhatsApp(whatsappId: string) {
   }
 }
 
+// Force reset a session (clears all session data and requires new QR scan)
+export async function forceResetSession(whatsappId: string) {
+  console.log(`[Session] Force resetting session for ${whatsappId}`);
+  
+  // Disconnect if connected
+  await disconnectWhatsApp(whatsappId);
+  
+  // Clear the session files
+  clearCorruptedSession(whatsappId);
+  
+  // Update DB
+  try {
+    await db.update(whatsappTable)
+      .set({ connected: false })
+      .where(eq(whatsappTable.id, whatsappId));
+  } catch (e) {
+    console.error("Error updating DB on force reset:", e);
+  }
+  
+  console.log(`[Session] Session reset complete for ${whatsappId}`);
+}
+
 export function getSocket(whatsappId: string) {
   return sessions.get(whatsappId);
 }
 
 export function getQr(whatsappId: string) {
   return qrs.get(whatsappId);
+}
+
+// Check if a session is currently connecting
+export function isConnecting(whatsappId: string) {
+  return connectingLocks.has(whatsappId);
 }
