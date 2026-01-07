@@ -16,6 +16,7 @@ export function ensureMediaDirectory(): void {
 
 /**
  * Sanitize filename to prevent path traversal and ensure filesystem compatibility
+ * Limits to 255 characters due to common filesystem limits (e.g., ext4, NTFS)
  */
 export function safeFilename(filename: string): string {
   // Remove path components
@@ -25,7 +26,7 @@ export function safeFilename(filename: string): string {
   const safe = basename
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_{2,}/g, "_")
-    .substring(0, 255); // Limit length
+    .substring(0, 255); // Filesystem limit
   
   return safe || "file";
 }
@@ -140,7 +141,9 @@ export async function downloadAndSaveMedia(
     };
     
     // Public URL (Next.js serves from /public as /)
-    const url = `/media/${relativePath.replace(/\\/g, "/")}`;
+    // Normalize path separators to forward slashes for URLs
+    const normalizedPath = relativePath.split(path.sep).join('/');
+    const url = `/media/${normalizedPath}`;
     
     console.log("[Media] Saved media file:", { url, size: metadata.size });
     

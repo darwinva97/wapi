@@ -77,6 +77,14 @@ if (!fs.existsSync(SESSIONS_DIR)) {
   fs.mkdirSync(SESSIONS_DIR);
 }
 
+// Acknowledgment status constants
+const ACK_STATUS = {
+  PENDING: 0,
+  SENT: 1,
+  DELIVERED: 2,
+  READ: 3,
+} as const;
+
 // Helper to detect message type and extract metadata
 function detectMessageType(message: proto.IMessage | null | undefined): {
   type: 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'document';
@@ -442,12 +450,13 @@ export async function connectToWhatsApp(whatsappId: string) {
             const buffer = await downloadMediaFromMessage(messageContent, messageType);
             
             if (buffer) {
-              const suggestedFilename = metadata.fileName || `${messageType}_${msg.key.id}`;
-              fileName = metadata.fileName || null;
+              // Use original filename from metadata, or generate one
+              const sanitizedFilename = metadata.fileName || `${messageType}_${msg.key.id}`;
+              fileName = metadata.fileName || null; // Store original filename separately
               
               const saveResult = await downloadAndSaveMedia(
                 buffer,
-                suggestedFilename,
+                sanitizedFilename,
                 whatsappId,
                 msg.key.id || crypto.randomUUID(),
                 metadata
@@ -467,7 +476,7 @@ export async function connectToWhatsApp(whatsappId: string) {
 
         // Determine initial ackStatus
         // fromMe messages start as sent (1), incoming messages are delivered (2)
-        const ackStatus = msg.key.fromMe ? 1 : 2;
+        const ackStatus = msg.key.fromMe ? ACK_STATUS.SENT : ACK_STATUS.DELIVERED;
 
         await db.insert(messageTable).values({
           id: msg.key.id || crypto.randomUUID(),
@@ -564,15 +573,15 @@ export async function connectToWhatsApp(whatsappId: string) {
         
         if (statusUpdate.status !== undefined) {
           // Direct status from Baileys
-          if (statusUpdate.status === 0) newAckStatus = 0; // pending/error
-          else if (statusUpdate.status === 1) newAckStatus = 1; // sent
-          else if (statusUpdate.status === 2) newAckStatus = 2; // delivered
-          else if (statusUpdate.status === 3) newAckStatus = 3; // read
+          if (statusUpdate.status === 0) newAckStatus = ACK_STATUS.PENDING;
+          else if (statusUpdate.status === 1) newAckStatus = ACK_STATUS.SENT;
+          else if (statusUpdate.status === 2) newAckStatus = ACK_STATUS.DELIVERED;
+          else if (statusUpdate.status === 3) newAckStatus = ACK_STATUS.READ;
         }
         
-        // Check for read receipt
-        if (statusUpdate.readTimestamp || (statusUpdate as any).read) {
-          newAckStatus = 3; // read
+        // Check for read receipt (handle different possible property names)
+        if (statusUpdate.readTimestamp || (statusUpdate as { read?: unknown }).read) {
+          newAckStatus = ACK_STATUS.READ;
         }
         
         if (newAckStatus !== undefined) {

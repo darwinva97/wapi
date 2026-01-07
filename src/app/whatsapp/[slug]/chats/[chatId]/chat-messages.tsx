@@ -133,7 +133,7 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
               {msg.messageType === 'image' && msg.mediaUrl && (
                 <img 
                   src={msg.mediaUrl} 
-                  alt="Image" 
+                  alt={msg.fileName ? `Imagen: ${msg.fileName}` : 'Imagen de WhatsApp'} 
                   className="rounded max-w-full h-auto max-h-64 object-contain"
                 />
               )}
@@ -142,16 +142,22 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
                   src={msg.mediaUrl} 
                   controls 
                   className="rounded max-w-full h-auto max-h-64"
+                  aria-label={msg.fileName ? `Video: ${msg.fileName}` : 'Video de WhatsApp'}
                 />
               )}
               {msg.messageType === 'audio' && msg.mediaUrl && (
-                <audio src={msg.mediaUrl} controls className="w-full" />
+                <audio 
+                  src={msg.mediaUrl} 
+                  controls 
+                  className="w-full"
+                  aria-label={msg.fileName ? `Audio: ${msg.fileName}` : 'Audio de WhatsApp'}
+                />
               )}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {msg.messageType === 'sticker' && msg.mediaUrl && (
                 <img 
                   src={msg.mediaUrl} 
-                  alt="Sticker" 
+                  alt="Sticker de WhatsApp" 
                   className="rounded max-w-32 h-auto"
                 />
               )}
