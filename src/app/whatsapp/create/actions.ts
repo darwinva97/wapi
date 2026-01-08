@@ -7,13 +7,16 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
-export async function createWhatsappAction(formData: FormData) {
+export async function createWhatsappAction(
+  prevState: { success: boolean; error: string },
+  formData: FormData
+) {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
 
   if (!session) {
-    throw new Error("Unauthorized");
+    return { success: false, error: "No autorizado" };
   }
 
   const name = formData.get("name") as string;
@@ -22,7 +25,7 @@ export async function createWhatsappAction(formData: FormData) {
   const slug = formData.get("slug") as string;
 
   if (!name || !phoneNumber || !slug) {
-    throw new Error("Name, Phone Number and Slug are required");
+    return { success: false, error: "Nombre, teléfono y slug son requeridos" };
   }
 
   // Check if slug is unique
@@ -33,21 +36,26 @@ export async function createWhatsappAction(formData: FormData) {
     .limit(1);
 
   if (existing.length > 0) {
-    throw new Error("Slug already exists");
+    return { success: false, error: "El slug ya está en uso" };
   }
 
-  const id = crypto.randomUUID();
+  try {
+    const id = crypto.randomUUID();
 
-  await db.insert(whatsappTable).values({
-    id,
-    userId: session.user.id,
-    name,
-    phoneNumber,
-    description: description || null,
-    slug,
-    connected: false,
-    enabled: true,
-  });
+    await db.insert(whatsappTable).values({
+      id,
+      userId: session.user.id,
+      name,
+      phoneNumber,
+      description: description || null,
+      slug,
+      connected: false,
+      enabled: true,
+    });
 
-  redirect(`/whatsapp/${slug}`);
+    redirect(`/whatsapp/${slug}`);
+  } catch (error) {
+    console.error("Error creating WhatsApp:", error);
+    return { success: false, error: "Error al crear WhatsApp. Intenta nuevamente." };
+  }
 }

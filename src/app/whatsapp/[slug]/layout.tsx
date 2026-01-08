@@ -1,14 +1,60 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit, MessageSquare, Users, UsersRound } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+	ArrowLeft,
+	MessageSquare,
+	Users,
+	UsersRound,
+	Settings,
+	Webhook,
+	Home,
+	Check,
+	X,
+	ChevronsUpDown,
+} from "lucide-react";
 import Link from "next/link";
 import { ConnectButton } from "./connect-button";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getWAFromSlugUserIdCache } from "./cache";
-import { NavLink } from "./_components/nav-link";
 import { Suspense } from "react";
+import { db } from "@/db";
+import { whatsappTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
+
+function SidebarItem({
+	href,
+	icon,
+	children,
+	active = false,
+}: {
+	href: string;
+	icon: React.ReactNode;
+	children: React.ReactNode;
+	active?: boolean;
+}) {
+	return (
+		<Link
+			href={href}
+			className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+				active
+					? "bg-accent text-accent-foreground"
+					: "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+			}`}
+		>
+			{icon}
+			{children}
+		</Link>
+	);
+}
 
 async function WhatsappLayout({
 	children,
@@ -31,36 +77,133 @@ async function WhatsappLayout({
 	if (!wa) {
 		notFound();
 	}
+
+	// Fetch all user's WhatsApps for the dropdown
+	const allWhatsapps = await db.query.whatsappTable.findMany({
+		where: eq(whatsappTable.userId, session.user.id),
+	});
+
 	return (
-		<div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
-			<div className="mx-auto max-w-7xl w-full flex-1 flex flex-col min-h-0 p-8 pb-4 gap-4">
-				<div className="flex items-center justify-between shrink-0">
-					<div className="flex items-center gap-4">
-						<Button variant="ghost" size="icon" asChild>
-							<Link href="/">
-								<ArrowLeft className="h-4 w-4" />
-							</Link>
-						</Button>
-						<h1 className="text-3xl font-bold tracking-tight text-gray-900">
-							<Link href={`/whatsapp/${wa.slug}`}>
-								{wa.name}
-							</Link>
-						</h1>
-						<Badge variant={wa.connected ? 'default' : 'destructive'}>
-							{wa.connected ? 'Conectado' : 'Desconectado'}
+		<div className="flex h-screen bg-background">
+			{/* Sidebar */}
+			<aside className="w-56 border-r flex flex-col bg-muted/30">
+				{/* Sidebar Header */}
+				<div className="p-3 border-b space-y-3">
+					<Button variant="ghost" size="sm" asChild className="w-full justify-start h-8 px-2 text-muted-foreground">
+						<Link href="/" className="gap-2">
+							<ArrowLeft className="h-4 w-4" />
+							<span>Back to WhatsApps</span>
+						</Link>
+					</Button>
+
+					{/* WhatsApp Selector Dropdown */}
+					<Popover>
+						<PopoverTrigger asChild>
+							<Button variant="outline" size="sm" className="w-full justify-start h-auto px-2 py-1.5">
+								<div className="flex items-center gap-2 flex-1 min-w-0">
+									<div
+										className={`h-5 w-5 rounded flex items-center justify-center shrink-0 ${
+											wa.connected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+										}`}
+									>
+										<MessageSquare className="h-3 w-3" strokeWidth={2} />
+									</div>
+									<span className="truncate text-sm">{wa.name}</span>
+								</div>
+								<ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+							</Button>
+						</PopoverTrigger>
+						<PopoverContent className="w-56 p-1" align="start">
+							<ScrollArea className="max-h-[300px]">
+								<div className="p-1">
+									{allWhatsapps.map((w) => (
+										<Link
+											key={w.id}
+											href={`/whatsapp/${w.slug}`}
+											className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors ${
+												w.id === wa.id
+													? "bg-accent text-accent-foreground"
+													: "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+											}`}
+										>
+											<div
+												className={`h-4 w-4 rounded flex items-center justify-center shrink-0 ${
+													w.connected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+												}`}
+											>
+												<MessageSquare className="h-2.5 w-2.5" strokeWidth={2} />
+											</div>
+											<span className="truncate">{w.name}</span>
+											{w.id === wa.id && (
+												<Check className="h-3.5 w-3.5 shrink-0 ml-auto" />
+											)}
+										</Link>
+									))}
+								</div>
+							</ScrollArea>
+						</PopoverContent>
+					</Popover>
+
+					{/* Status Badges */}
+					<div className="flex items-center gap-1.5">
+						<Badge variant={wa.connected ? "default" : "secondary"} className="gap-1 text-[10px] px-1.5 py-0">
+							{wa.connected ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
+							{wa.connected ? "Online" : "Offline"}
+						</Badge>
+						<Badge variant={wa.enabled ? "default" : "outline"} className="text-[10px] px-1.5 py-0">
+							{wa.enabled ? "Active" : "Inactive"}
 						</Badge>
 					</div>
-					<div className="flex gap-2">
-						<NavLink icon={<MessageSquare className="mr-2 h-4 w-4" />} text="Chats" baseSlug={wa.slug} slug="chats" />
-						<NavLink icon={<Users className="mr-2 h-4 w-4" />} text="Contactos" baseSlug={wa.slug} slug="contacts" />
-						<NavLink icon={<UsersRound className="mr-2 h-4 w-4" />} text="Grupos" baseSlug={wa.slug} slug="groups" />
-						<NavLink icon={<Edit className="mr-2 h-4 w-4" />} text="Editar" baseSlug={wa.slug} slug="edit" />
-						<ConnectButton id={wa.id} isConnected={wa.connected} />
-					</div>
 				</div>
-				<main className="flex-1 min-h-0 overflow-hidden flex flex-col">
+
+				{/* Sidebar Navigation */}
+				<ScrollArea className="flex-1 px-2 py-2">
+					<nav className="space-y-0.5">
+						<SidebarItem href={`/whatsapp/${wa.slug}`} icon={<Home className="h-4 w-4" />}>
+							Overview
+						</SidebarItem>
+						<SidebarItem href={`/whatsapp/${wa.slug}/chats`} icon={<MessageSquare className="h-4 w-4" />}>
+							Chats
+						</SidebarItem>
+						<SidebarItem href={`/whatsapp/${wa.slug}/contacts`} icon={<Users className="h-4 w-4" />}>
+							Contacts
+						</SidebarItem>
+						<SidebarItem href={`/whatsapp/${wa.slug}/groups`} icon={<UsersRound className="h-4 w-4" />}>
+							Groups
+						</SidebarItem>
+						<Separator className="my-2" />
+						<SidebarItem href={`/whatsapp/${wa.slug}/connections/create`} icon={<Webhook className="h-4 w-4" />}>
+							New Connection
+						</SidebarItem>
+						<SidebarItem href={`/whatsapp/${wa.slug}/edit`} icon={<Settings className="h-4 w-4" />}>
+							Settings
+						</SidebarItem>
+					</nav>
+				</ScrollArea>
+
+				{/* Sidebar Footer */}
+				<div className="p-3 border-t">
+					<ConnectButton id={wa.id} isConnected={wa.connected} />
+				</div>
+			</aside>
+
+			{/* Main Content Area */}
+			<div className="flex-1 flex flex-col overflow-hidden">
+				{/* Top Bar with Breadcrumb */}
+				<header className="h-12 border-b flex items-center px-4 shrink-0">
+					<div className="flex items-center gap-2 text-sm text-muted-foreground">
+						<Link href="/" className="hover:text-foreground transition-colors">
+							WhatsApps
+						</Link>
+						<span>/</span>
+						<span className="text-foreground font-medium">{wa.name}</span>
+					</div>
+				</header>
+
+				{/* Page Content */}
+				<div className="flex-1 overflow-auto">
 					{children}
-				</main>
+				</div>
 			</div>
 		</div>
 	);
@@ -69,7 +212,9 @@ export default function WhatsappLayoutWrapper(props: {
 	children: React.ReactNode;
 	params: Promise<{ slug: string }>;
 }) {
-	return <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
-		<WhatsappLayout {...props} />
-	</Suspense>
+	return (
+		<Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+			<WhatsappLayout {...props} />
+		</Suspense>
+	);
 }
