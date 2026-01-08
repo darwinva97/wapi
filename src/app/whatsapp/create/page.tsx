@@ -3,118 +3,162 @@
 import { createWhatsappAction } from "./actions";
 import { useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ArrowLeft, MessageCircle, AlertCircle } from "lucide-react";
+import { Spinner as SpinnerComponent } from "@/components/ui/spinner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function CreateWhatsappPage() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
+    setError("");
     try {
       await createWhatsappAction(formData);
     } catch (error) {
       console.error(error);
-      alert("Error al crear WhatsApp");
+      setError("Error al crear WhatsApp. Intenta nuevamente.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Conectar nuevo WhatsApp
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Ingresa los detalles de la cuenta que deseas conectar
-        </p>
-      </div>
+    <div className="min-h-screen">
+      {/* Header */}
+      <header className="border-b bg-card/50 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-7xl items-center px-4 py-4 sm:px-6 lg:px-8">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/" className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Volver
+            </Link>
+          </Button>
+        </div>
+      </header>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form action={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Nombre de la cuenta
-              </label>
-              <div className="mt-1">
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
-                  placeholder="Ej: Ventas Principal"
-                />
-              </div>
+      <div className="mx-auto flex max-w-2xl items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+        <div className="w-full space-y-8">
+          {/* Header Section */}
+          <div className="flex flex-col items-center text-center space-y-2">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <MessageCircle className="h-8 w-8" strokeWidth={2} />
             </div>
-
             <div>
-              <label htmlFor="slug" className="block text-sm font-medium text-gray-700">
-                Slug (Identificador único)
-              </label>
-              <div className="mt-1">
-                <input
-                  id="slug"
-                  name="slug"
-                  type="text"
-                  required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
-                  placeholder="Ej: ventas-principal"
-                />
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                Identificador único para la API (solo letras minúsculas, números y guiones).
+              <h1 className="text-2xl font-bold tracking-tight">Conectar nuevo WhatsApp</h1>
+              <p className="text-muted-foreground">
+                Ingresa los detalles de la cuenta que deseas conectar
               </p>
             </div>
+          </div>
 
-            <div>
-              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
-                Número de teléfono
-              </label>
-              <div className="mt-1">
-                <input
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  type="tel"
-                  required
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
-                  placeholder="Ej: +51 999 999 999"
-                />
-              </div>
-            </div>
+          {/* Form Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Información de la cuenta</CardTitle>
+              <CardDescription>
+                Configura los datos básicos de tu cuenta de WhatsApp
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={handleSubmit} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nombre de la cuenta</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    type="text"
+                    required
+                    placeholder="Ej: Ventas Principal"
+                    disabled={loading}
+                  />
+                </div>
 
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                Descripción (Opcional)
-              </label>
-              <div className="mt-1">
-                <textarea
-                  id="description"
-                  name="description"
-                  rows={3}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-gray-900"
-                  placeholder="Para qué se usará esta cuenta..."
-                />
-              </div>
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="slug">
+                    Slug <span className="text-muted-foreground">(Identificador único)</span>
+                  </Label>
+                  <Input
+                    id="slug"
+                    name="slug"
+                    type="text"
+                    required
+                    placeholder="Ej: ventas-principal"
+                    disabled={loading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Identificador único para la API (solo letras minúsculas, números y guiones)
+                  </p>
+                </div>
 
-            <div className="flex items-center justify-between gap-4">
-              <Link
-                href="/"
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Cancelar
-              </Link>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                {loading ? "Guardando..." : "Guardar y Conectar"}
-              </button>
-            </div>
-          </form>
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber">Número de teléfono</Label>
+                  <Input
+                    id="phoneNumber"
+                    name="phoneNumber"
+                    type="tel"
+                    required
+                    placeholder="Ej: +51 999 999 999"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">
+                    Descripción <span className="text-muted-foreground">(Opcional)</span>
+                  </Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    rows={3}
+                    placeholder="Para qué se usará esta cuenta..."
+                    disabled={loading}
+                  />
+                </div>
+
+                {error && (
+                  <Alert variant="destructive" className="py-3">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="flex items-center justify-between gap-4 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    asChild
+                    disabled={loading}
+                  >
+                    <Link href="/">Cancelar</Link>
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={loading}>
+                    {loading ? (
+                      <>
+                        <SpinnerComponent className="mr-2" />
+                        Guardando...
+                      </>
+                    ) : (
+                      "Guardar y Conectar"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
