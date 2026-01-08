@@ -32,7 +32,7 @@ async function WhatsappLayout({
 		notFound();
 	}
 	return (
-		<div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+		<div className="h-screen bg-background flex flex-col overflow-hidden">
 			<div className="mx-auto max-w-7xl w-full flex-1 flex flex-col min-h-0 p-8 pb-4 gap-4">
 				<div className="flex items-center justify-between shrink-0">
 					<div className="flex items-center gap-4">
@@ -41,7 +41,7 @@ async function WhatsappLayout({
 								<ArrowLeft className="h-4 w-4" />
 							</Link>
 						</Button>
-						<h1 className="text-3xl font-bold tracking-tight text-gray-900">
+						<h1 className="text-3xl font-bold tracking-tight">
 							<Link href={`/whatsapp/${wa.slug}`}>
 								{wa.name}
 							</Link>

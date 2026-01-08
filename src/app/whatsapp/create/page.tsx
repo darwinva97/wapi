@@ -1,7 +1,7 @@
 "use client";
 
 import { createWhatsappAction } from "./actions";
-import { useState } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,22 +18,16 @@ import { ArrowLeft, MessageCircle, AlertCircle } from "lucide-react";
 import { Spinner as SpinnerComponent } from "@/components/ui/spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export default function CreateWhatsappPage() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+const initialState = {
+  success: false,
+  error: "",
+};
 
-  async function handleSubmit(formData: FormData) {
-    setLoading(true);
-    setError("");
-    try {
-      await createWhatsappAction(formData);
-    } catch (error) {
-      console.error(error);
-      setError("Error al crear WhatsApp. Intenta nuevamente.");
-    } finally {
-      setLoading(false);
-    }
-  }
+export default function CreateWhatsappPage() {
+  const [state, formAction, isPending] = useActionState(
+    createWhatsappAction,
+    initialState
+  );
 
   return (
     <div className="min-h-screen">
@@ -73,7 +67,7 @@ export default function CreateWhatsappPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form action={handleSubmit} className="space-y-5">
+              <form action={formAction} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nombre de la cuenta</Label>
                   <Input
@@ -82,7 +76,7 @@ export default function CreateWhatsappPage() {
                     type="text"
                     required
                     placeholder="Ej: Ventas Principal"
-                    disabled={loading}
+                    disabled={isPending}
                   />
                 </div>
 
@@ -96,7 +90,7 @@ export default function CreateWhatsappPage() {
                     type="text"
                     required
                     placeholder="Ej: ventas-principal"
-                    disabled={loading}
+                    disabled={isPending}
                   />
                   <p className="text-xs text-muted-foreground">
                     Identificador único para la API (solo letras minúsculas, números y guiones)
@@ -111,7 +105,7 @@ export default function CreateWhatsappPage() {
                     type="tel"
                     required
                     placeholder="Ej: +51 999 999 999"
-                    disabled={loading}
+                    disabled={isPending}
                   />
                 </div>
 
@@ -124,14 +118,14 @@ export default function CreateWhatsappPage() {
                     name="description"
                     rows={3}
                     placeholder="Para qué se usará esta cuenta..."
-                    disabled={loading}
+                    disabled={isPending}
                   />
                 </div>
 
-                {error && (
+                {state.error && (
                   <Alert variant="destructive" className="py-3">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="text-sm">{error}</AlertDescription>
+                    <AlertDescription className="text-sm">{state.error}</AlertDescription>
                   </Alert>
                 )}
 
@@ -141,12 +135,12 @@ export default function CreateWhatsappPage() {
                     variant="outline"
                     className="flex-1"
                     asChild
-                    disabled={loading}
+                    disabled={isPending}
                   >
                     <Link href="/">Cancelar</Link>
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={loading}>
-                    {loading ? (
+                  <Button type="submit" className="flex-1" disabled={isPending}>
+                    {isPending ? (
                       <>
                         <SpinnerComponent className="mr-2" />
                         Guardando...
