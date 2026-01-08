@@ -52,6 +52,11 @@ export default async function ChatPage({
     }
   }
 
+  const typedMessages = messages.map(msg => ({
+    ...msg,
+    mediaMetadata: msg.mediaMetadata as Record<string, unknown> | undefined
+  }));
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -59,7 +64,7 @@ export default async function ChatPage({
         <p className="text-xs text-muted-foreground font-mono">{decodedChatId}</p>
       </div>
       
-      <ChatMessages initialMessages={messages} chatId={decodedChatId} />
+      <ChatMessages initialMessages={typedMessages} chatId={decodedChatId} />
       
       <ChatInput slug={slug} connectionSlug={connectionSlug} chatId={decodedChatId} />
     </div>
