@@ -279,10 +279,59 @@ El filtro de receiver actual solo soporta JSON estático. Próximamente:
 - 🤖 Integraciones nativas (n8n, Zapier)
 - 💬 Respuestas automáticas configurables
 
+## � Despliegue
+
+### Docker y Kubernetes
+
+Este proyecto está listo para desplegarse en contenedores Docker y en clusters de Kubernetes (k8s, k3s, minikube, etc.):
+
+#### Docker Local
+
+```bash
+# Desarrollo con hot reload
+docker-compose --profile dev up wapi-dev
+
+# Producción
+docker-compose up
+```
+
+#### Kubernetes
+
+```bash
+# Despliegue completo (construir, subir, desplegar)
+IMAGE_NAME=your-registry/wapi IMAGE_TAG=v1.0.0 ./deploy.sh full
+
+# Ver estado
+./deploy.sh status
+
+# Ver logs
+./deploy.sh logs
+```
+
+**Documentación completa:**
+- [Guía Rápida de Kubernetes](docs/KUBERNETES_QUICKSTART.md) - Inicio rápido
+- [Documentación Completa de Kubernetes](docs/KUBERNETES.md) - Guía detallada
+- [Guía Específica para k3s](docs/K3S.md) - Despliegue en k3s
+
+**Características del despliegue en Kubernetes:**
+- ✅ Multi-stage Dockerfile optimizado
+- ✅ Manifiestos completos de K8s (Deployment, Service, Ingress, PVC)
+- ✅ Volúmenes persistentes para sesiones y media
+- ✅ ConfigMaps y Secrets para configuración
+- ✅ Health checks y resource limits
+- ✅ Script de despliegue automatizado
+- ✅ Soporte para Kustomize
+
 ## 📚 Documentación Adicional
 
 - [API de Administración](docs/ADMIN_API.md)
-- [Database Seeding](docs/SEEDING.md)
+- **Despliegue en Kubernetes:**
+  - [Guía Rápida](docs/KUBERNETES_QUICKSTART.md)
+  - [Documentación Completa](docs/KUBERNETES.md)
+  - [Guía para k3s](docs/K3S.md) - Despliegue en k3s
+  - [Arquitectura](docs/KUBERNETES_ARCHITECTURE.md)
+  - [Despliegue en Kubernetes - Arquitectura](docs/KUBERNETES_ARCHITECTURE.md)
+- [Checklist de Configuración](KUBERNETES_SETUP_CHECKLIST.md)
 - [Changelog](CHANGELOG.md)
 
 ## 📝 Licencia

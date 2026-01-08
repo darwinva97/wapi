@@ -44,3 +44,13 @@ next-env.d.ts
 whatsapp_sessions/
 whatsapp_sessions/*
 *.db
+
+# Kubernetes secrets with real credentials
+k8s/secret.yaml
+
+# Backups
+backups/
+*.tar.gz
+
+# Docker
+docker-compose.override.yml

@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   cacheComponents: true,
   serverExternalPackages: ['baileys', 'pino', 'thread-stream'],
+  output: 'standalone',
   experimental: {
     turbopackFileSystemCacheForDev: true,
   },
