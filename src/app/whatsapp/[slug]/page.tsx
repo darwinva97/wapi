@@ -24,13 +24,8 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  ArrowLeft,
   Plus,
-  MessageCircle,
   Phone,
-  Settings,
-  Check,
-  X,
   Zap,
   Webhook,
 } from "lucide-react";
@@ -39,13 +34,16 @@ import { getWAFromSlugUserIdCache } from "./cache";
 
 function DetailSkeleton() {
   return (
-    <div className="min-h-screen space-y-6 p-4 sm:p-6 lg:p-8">
-      <Skeleton className="h-8 w-48" />
+    <div className="flex-1 overflow-auto p-6 space-y-6">
       <Skeleton className="h-32 w-full" />
-      <Skeleton className="h-8 w-32" />
-      <div className="space-y-3">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-16 w-full" />
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-10 w-40" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
       </div>
     </div>
   );
@@ -76,52 +74,13 @@ async function WhatsappDetailView({
   });
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Volver
-              </Link>
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${wa.connected ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                <MessageCircle className="h-5 w-5" strokeWidth={2} />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold">{wa.name}</h1>
-                <p className="text-xs text-muted-foreground">{wa.phoneNumber}</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge variant={wa.connected ? "default" : "secondary"} className="gap-1">
-              {wa.connected ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-              {wa.connected ? "Conectado" : "Desconectado"}
-            </Badge>
-            <Badge variant={wa.enabled ? "default" : "destructive"}>
-              {wa.enabled ? "Activo" : "Inactivo"}
-            </Badge>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/whatsapp/${wa.slug}/edit`}>
-                <Settings className="mr-2 h-4 w-4" />
-                Editar
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="flex-1 overflow-auto">
+      <div className="p-6 space-y-6">
         {/* Account Details Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Información de la cuenta</CardTitle>
-            <CardDescription>Detalles y configuración de WhatsApp</CardDescription>
+            <CardTitle>Overview</CardTitle>
+            <CardDescription>Información y estado de la cuenta</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -154,13 +113,13 @@ async function WhatsappDetailView({
             <div>
               <h2 className="text-xl font-bold tracking-tight">Conexiones</h2>
               <p className="text-sm text-muted-foreground">
-                Configura integraciones para enviar y recibir mensajes
+                {connections.length} {connections.length === 1 ? "conexión" : "conexiones"} configurada{connections.length !== 1 ? "s" : ""}
               </p>
             </div>
-            <Button asChild>
+            <Button size="sm" asChild>
               <Link href={`/whatsapp/${wa.slug}/connections/create`}>
                 <Plus className="mr-2 h-4 w-4" />
-                Nueva conexión
+                Nueva
               </Link>
             </Button>
           </div>
@@ -194,41 +153,39 @@ async function WhatsappDetailView({
                   className="group"
                 >
                   <Card className="h-full transition-all hover:shadow-md hover:border-primary/50">
-                    <CardContent className="p-6">
+                    <CardContent className="p-5">
                       <div className="space-y-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-semibold group-hover:text-primary transition-colors">
-                              {connection.name}
-                            </h3>
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                              {connection.description || "Sin descripción"}
-                            </p>
-                          </div>
+                        <div>
+                          <h3 className="font-semibold group-hover:text-primary transition-colors">
+                            {connection.name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {connection.description || "Sin descripción"}
+                          </p>
                         </div>
 
                         <div className="flex flex-wrap gap-2">
                           {connection.senderEnabled ? (
                             <Badge variant="default" className="gap-1 text-xs">
                               <Zap className="h-3 w-3" />
-                              Sender Activo
+                              Sender
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="gap-1 text-xs">
                               <Zap className="h-3 w-3" />
-                              Sender Inactivo
+                              Sender
                             </Badge>
                           )}
 
                           {connection.receiverEnabled ? (
                             <Badge variant="default" className="gap-1 text-xs">
                               <Webhook className="h-3 w-3" />
-                              Receiver Activo
+                              Receiver
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="gap-1 text-xs">
                               <Webhook className="h-3 w-3" />
-                              Receiver Inactivo
+                              Receiver
                             </Badge>
                           )}
                         </div>
@@ -240,7 +197,7 @@ async function WhatsappDetailView({
             </div>
           )}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, MessageCircle, Webhook } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Zap, Webhook } from "lucide-react";
 
 export default async function CreateConnectionView({
   params,
@@ -40,28 +41,18 @@ export default async function CreateConnectionView({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-3 pb-4 border-b">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href={`/whatsapp/${wa.slug}`}>
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Webhook className="h-4 w-4" strokeWidth={2} />
-          </div>
+    <div className="flex-1 overflow-auto">
+      <ScrollArea className="h-full">
+        <div className="max-w-2xl mx-auto p-6 space-y-6">
+          {/* Page Header */}
           <div>
-            <h2 className="text-lg font-semibold">Nueva Conexión</h2>
-            <p className="text-xs text-muted-foreground">{wa.name}</p>
+            <h1 className="text-2xl font-bold tracking-tight">Nueva Conexión</h1>
+            <p className="text-muted-foreground">
+              Configura una nueva integración para <span className="font-medium text-foreground">{wa.name}</span>
+            </p>
           </div>
-        </div>
-      </div>
 
-      {/* Form */}
-      <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-2xl py-6">
+          {/* Form */}
           <form action={createConnectionAction}>
             <input type="hidden" name="whatsappSlug" value={wa.slug} />
             <Card>
@@ -98,7 +89,7 @@ export default async function CreateConnectionView({
                 <div className="space-y-4 border rounded-lg p-4">
                   <div className="flex items-center space-x-2">
                     <Checkbox id="receiverEnabled" name="receiverEnabled" />
-                    <Label htmlFor="receiverEnabled" className="font-medium">
+                    <Label htmlFor="receiverEnabled" className="font-medium cursor-pointer">
                       Habilitar Receiver
                     </Label>
                   </div>
@@ -110,7 +101,7 @@ export default async function CreateConnectionView({
                 <div className="space-y-4 border rounded-lg p-4">
                   <div className="flex items-center space-x-2">
                     <Checkbox id="senderEnabled" name="senderEnabled" />
-                    <Label htmlFor="senderEnabled" className="font-medium">
+                    <Label htmlFor="senderEnabled" className="font-medium cursor-pointer">
                       Habilitar Sender
                     </Label>
                   </div>
@@ -129,7 +120,7 @@ export default async function CreateConnectionView({
             </Card>
           </form>
         </div>
-      </div>
+      </ScrollArea>
     </div>
   );
 }
