@@ -2,6 +2,19 @@
 import { useState } from "react";
 import { signIn } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
+import { AlertCircle, MessageCircle } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -25,87 +38,89 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 bg-white p-10 rounded-xl shadow-lg">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            Iniciar sesión
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Ingresa tus credenciales para acceder
-          </p>
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-muted/80 via-background to-muted/80 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-6">
+        {/* Logo/Brand */}
+        <div className="flex flex-col items-center space-y-2">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
+            <MessageCircle className="h-7 w-7" strokeWidth={2} />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">WAPI</h1>
+          <p className="text-sm text-muted-foreground">WhatsApp API Gateway</p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm text-gray-900"
-                placeholder="tu@email.com"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Contraseña
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm text-gray-900"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
 
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Error
-                  </h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>{error}</p>
-                  </div>
-                </div>
+        <Card className="shadow-lg border-border/50">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="text-xl font-semibold">Bienvenido de nuevo</CardTitle>
+            <CardDescription>
+              Ingresa tus credenciales para acceder a tu cuenta
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={handleLogin}>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@email.com"
+                  disabled={loading}
+                  className="h-10"
+                />
               </div>
-            </div>
-          )}
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium">
+                  Contraseña
+                </Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={loading}
+                  className="h-10"
+                />
+              </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-            >
-              {loading ? (
-                <span className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Ingresando...
-                </span>
-              ) : (
-                "Ingresar"
+              {error && (
+                <Alert variant="destructive" className="py-3">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">{error}</AlertDescription>
+                </Alert>
               )}
-            </button>
-          </div>
-        </form>
+
+              <Button
+                type="submit"
+                className="w-full h-10 mt-2 shadow-sm"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Spinner className="mr-2" />
+                    Iniciando sesión...
+                  </>
+                ) : (
+                  "Iniciar sesión"
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Al iniciar sesión, aceptas nuestros términos y condiciones
+        </p>
       </div>
     </main>
   );

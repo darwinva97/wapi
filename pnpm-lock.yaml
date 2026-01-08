@@ -113,6 +113,9 @@ importers:
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
       drizzle-orm:
         specifier: ^0.44.7
         version: 0.44.7(@libsql/client@0.15.15)(kysely@0.28.8)
