@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface Message {
   id: string;
@@ -109,12 +110,13 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
               )}
             >
               {/* Media Preview */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               {msg.messageType === 'image' && msg.mediaUrl && (
-                <img 
+                <Image
                   src={msg.mediaUrl} 
                   alt={msg.fileName ? `Image: ${msg.fileName}` : 'WhatsApp image'} 
                   className="rounded max-w-full h-auto max-h-64 object-contain"
+                  width={400}
+                  height={400}
                 />
               )}
               {msg.messageType === 'video' && msg.mediaUrl && (
@@ -133,12 +135,13 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
                   aria-label={msg.fileName ? `Audio: ${msg.fileName}` : 'WhatsApp audio'}
                 />
               )}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               {msg.messageType === 'sticker' && msg.mediaUrl && (
-                <img 
+                <Image 
                   src={msg.mediaUrl} 
                   alt="WhatsApp sticker" 
                   className="rounded max-w-32 h-auto"
+                  width={128}
+                  height={128}
                 />
               )}
               {msg.messageType === 'document' && msg.mediaUrl && (

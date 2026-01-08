@@ -91,10 +91,10 @@ export default async function EditConnectionView({
                     rows={5}
                     defaultValue={connection.receiverRequest ? JSON.stringify(connection.receiverRequest, null, 2) : ''}
                     className="font-mono"
-                    placeholder='{ "url": "https://mi-api.com/webhook", "headers": { "Authorization": "Bearer ..." } }'
+                    placeholder='{"url": "https://mi-api.com/webhook", "headers": {"Authorization": "Bearer ..."}}'
                   />
                   <p className="text-xs">
-                    Debe ser un JSON válido con al menos una propiedad "url".
+                    Debe ser un JSON válido con al menos una propiedad &quot;url&quot;.
                   </p>
                 </div>
                 <div className="space-y-2 ml-6">

@@ -77,6 +77,9 @@ export function extractLidAndPn(remoteJid?: string, remoteJidAlt?: string): { li
     };
   }
 
+  console.log(remoteJid, remoteJidAlt, '______');
+  console.log(jid1, jid2, '______');
+
   return {
     lid: jid1, // Fallback, might not be a real LID if it doesn't have @lid
     pn: jid1.split('@')[0] || 'unknown'

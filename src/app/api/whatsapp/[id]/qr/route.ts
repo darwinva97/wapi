@@ -36,11 +36,11 @@ export async function GET(
       const encoder = new TextEncoder();
       let isClosed = false;
 
-      const send = (data: any) => {
+      const send = (data: Record<string, unknown>) => {
         if (isClosed) return;
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-        } catch (e) {
+        } catch {
           // Controller already closed, ignore
           isClosed = true;
         }
@@ -68,7 +68,7 @@ export async function GET(
              cleanup();
              try {
                controller.close();
-             } catch (e) {
+             } catch {
                // Already closed
              }
          }
@@ -81,7 +81,7 @@ export async function GET(
         cleanup();
         try {
           controller.close();
-        } catch (e) {
+        } catch {
           // Already closed
         }
       });

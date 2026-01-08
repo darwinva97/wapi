@@ -68,8 +68,8 @@ export async function POST(
     const result = await sock.sendMessage(jid, message);
 
     return NextResponse.json({ success: true, data: result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error sending message:", error);
-    return NextResponse.json({ error: "Failed to send message", details: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to send message", details: (error as Error).message }, { status: 500 });
   }
 }

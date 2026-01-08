@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface Message {
   id: string;
@@ -21,37 +22,32 @@ interface Message {
 interface ChatMessagesProps {
   initialMessages: Message[];
   chatId: string;
+  senderNames?: Record<string, string>;
+  isGroup?: boolean;
 }
 
-export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
+export function ChatMessages({ initialMessages, chatId, senderNames = {}, isGroup = false }: ChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const initialMessageIds = useMemo(() => initialMessages.map(m => m.id).join(','), [initialMessages]);
 
-  // Sync state with initialMessages only when message IDs actually change
+  // Sync state with initialMessages when they change
   useEffect(() => {
-    setMessages(prev => {
-      // Merge: keep SSE messages that aren't in initialMessages yet, add new ones from initialMessages
-      const existingIds = new Set(prev.map(m => m.id));
-      const newFromServer = initialMessages.filter(m => !existingIds.has(m.id));
-      
-      if (newFromServer.length === 0 && prev.length >= initialMessages.length) {
-        // No new messages from server, keep current state (preserves SSE messages)
-        return prev;
-      }
-      
-      // Merge all unique messages and sort by timestamp
-      const allIds = new Set<string>();
-      const merged = [...prev, ...initialMessages].filter(m => {
-        if (allIds.has(m.id)) return false;
-        allIds.add(m.id);
-        return true;
-      });
-      
-      return merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    // Merge: keep SSE messages that aren't in initialMessages yet, add new ones from initialMessages
+    const allIds = new Set<string>();
+    const merged = [...messages, ...initialMessages].filter(m => {
+      if (allIds.has(m.id)) return false;
+      allIds.add(m.id);
+      return true;
     });
-  }, [initialMessageIds, initialMessages]);
+    
+    const sorted = merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    
+    // Only update if there are actually new messages
+    if (sorted.length !== messages.length) {
+      setMessages(sorted);
+    }
+  }, [initialMessages]); // Only depend on initialMessages, not messages
 
   useEffect(() => {
     // Scroll to bottom on initial load
@@ -128,13 +124,20 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
                   : "bg-muted"
               )}
             >
+              {/* Sender Name for Group Messages */}
+              {isGroup && !msg.fromMe && (
+                <div className="text-xs font-semibold opacity-80 mb-1">
+                  {senderNames[msg.senderId] || msg.senderId}
+                </div>
+              )}
               {/* Media Preview */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               {msg.messageType === 'image' && msg.mediaUrl && (
-                <img 
+                <Image 
                   src={msg.mediaUrl} 
                   alt={msg.fileName ? `Imagen: ${msg.fileName}` : 'Imagen de WhatsApp'} 
                   className="rounded max-w-full h-auto max-h-64 object-contain"
+                  width={400}
+                  height={400}
                 />
               )}
               {msg.messageType === 'video' && msg.mediaUrl && (
@@ -153,12 +156,13 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
                   aria-label={msg.fileName ? `Audio: ${msg.fileName}` : 'Audio de WhatsApp'}
                 />
               )}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               {msg.messageType === 'sticker' && msg.mediaUrl && (
-                <img 
+                <Image
                   src={msg.mediaUrl} 
                   alt="Sticker de WhatsApp" 
                   className="rounded max-w-32 h-auto"
+                  width={128}
+                  height={128}
                 />
               )}
               {msg.messageType === 'document' && msg.mediaUrl && (

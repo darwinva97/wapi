@@ -12,12 +12,12 @@ export async function GET(
     start(controller) {
       const encoder = new TextEncoder();
 
-      const sendEvent = (data: any) => {
+      const sendEvent = (data: Record<string, unknown>) => {
         const text = `data: ${JSON.stringify(data)}\n\n`;
         controller.enqueue(encoder.encode(text));
       };
 
-      const listener = (data: any) => {
+      const listener = (data: Record<string, unknown>) => {
         sendEvent(data);
       };
 

@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { whatsappTable, messageTable, contactTable, groupTable } from "@/db/schema";
+import { contactTable, groupTable, messageTable } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -35,7 +35,46 @@ export default async function ChatPage({
       eq(messageTable.chatId, decodedChatId)
     ),
     orderBy: asc(messageTable.timestamp),
-  });
+  }).then(msgs => msgs.map(msg => ({
+    ...msg,
+    mediaMetadata: msg.mediaMetadata as Record<string, unknown> | undefined
+  })));
+
+  // Fetch sender names for group messages
+  const senderMap = new Map<string, string>();
+  if (decodedChatId.includes('@g.us')) {
+    // Get unique sender IDs
+    const senderIds = [...new Set(messages.map(m => m.senderId).filter(Boolean))];
+    
+    // Fetch contact information for each sender
+    for (const senderId of senderIds) {
+      // Try to find by lid first
+      let contact = await db.query.contactTable.findFirst({
+        where: and(
+          eq(contactTable.whatsappId, whatsapp.id),
+          eq(contactTable.lid, senderId)
+        )
+      });
+      
+      // If not found, try by pn
+      if (!contact) {
+        contact = await db.query.contactTable.findFirst({
+          where: and(
+            eq(contactTable.whatsappId, whatsapp.id),
+            eq(contactTable.pn, senderId)
+          )
+        });
+      }
+      
+      if (contact) {
+        senderMap.set(senderId, contact.name || contact.pushName || senderId);
+      } else {
+        // Fallback: extract phone number or use senderId
+        const phoneMatch = senderId.match(/(\d+)/);
+        senderMap.set(senderId, phoneMatch ? phoneMatch[1] : senderId);
+      }
+    }
+  }
 
   // Fetch chat info for header
   let chatName = decodedChatId;
@@ -68,7 +107,12 @@ export default async function ChatPage({
         <p className="text-xs text-muted-foreground font-mono">{decodedChatId}</p>
       </div>
       
-      <ChatMessages initialMessages={messages} chatId={decodedChatId} />
+      <ChatMessages 
+        initialMessages={messages} 
+        chatId={decodedChatId}
+        senderNames={Object.fromEntries(senderMap)}
+        isGroup={decodedChatId.includes('@g.us')}
+      />
       
       <ChatInput slug={slug} chatId={decodedChatId} />
     </div>

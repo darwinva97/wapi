@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { whatsappTable, groupTable } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { groupTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
