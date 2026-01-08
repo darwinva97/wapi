@@ -64,11 +64,11 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating user:", error);
 
     // Manejar errores específicos
-    if (error.message?.includes("UNIQUE constraint")) {
+    if ((error as Error).message?.includes("UNIQUE constraint")) {
       return NextResponse.json(
         { error: "El email ya está registrado" },
         { status: 409 }
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "Error al crear el usuario", details: error.message },
+      { error: "Error al crear el usuario", details: (error as Error).message },
       { status: 500 }
     );
   }

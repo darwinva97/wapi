@@ -22,7 +22,7 @@ export async function testSenderAction(connectionId: string, to: string, message
   });
   
   // Fallback if relation not defined in schema (likely not defined yet based on previous context)
-  let whatsappId = connection?.whatsappId;
+  const whatsappId = connection?.whatsappId;
   if (!connection) {
      return { success: false, error: "Connection not found" };
   }
@@ -58,9 +58,9 @@ export async function testSenderAction(connectionId: string, to: string, message
     const jid = to.includes("@") ? to : `${to}@s.whatsapp.net`;
     await sock.sendMessage(jid, { text: message });
     return { success: true, message: "Message sent successfully" };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Test Sender Error:", error);
-    return { success: false, error: error.message || "Failed to send message" };
+    return { success: false, error: (error as Error).message || "Failed to send message" };
   }
 }
 
@@ -141,8 +141,8 @@ export async function testReceiverAction(connectionId: string) {
       status: response.status,
       response: responseText.substring(0, 500) // Truncate if too long
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Test Receiver Error:", error);
-    return { success: false, error: error.message || "Failed to call webhook" };
+    return { success: false, error: (error as Error).message || "Failed to call webhook" };
   }
 }

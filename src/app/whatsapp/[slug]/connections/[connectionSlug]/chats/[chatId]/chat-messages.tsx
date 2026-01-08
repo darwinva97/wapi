@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface Message {
   id: string;
@@ -10,6 +11,12 @@ interface Message {
   timestamp: Date;
   fromMe: boolean;
   senderId: string;
+  messageType?: string;
+  mediaUrl?: string | null;
+  mediaMetadata?: Record<string, unknown>;
+  ackStatus?: number;
+  fileName?: string | null;
+  isAckUpdate?: boolean;
 }
 
 interface ChatMessagesProps {
@@ -50,10 +57,21 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
       try {
         const newMessage = JSON.parse(event.data);
         // Convert timestamp string back to Date object
-        newMessage.timestamp = new Date(newMessage.timestamp);
+        if (newMessage.timestamp) {
+          newMessage.timestamp = new Date(newMessage.timestamp);
+        }
         
         setMessages((prev) => {
-          // Avoid duplicates
+          // Handle ack updates
+          if (newMessage.isAckUpdate) {
+            return prev.map(m => 
+              m.id === newMessage.id 
+                ? { ...m, ackStatus: newMessage.ackStatus }
+                : m
+            );
+          }
+          
+          // Avoid duplicates for new messages
           if (prev.some(m => m.id === newMessage.id)) return prev;
           return [...prev, newMessage];
         });
@@ -91,10 +109,71 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
                   : "bg-muted"
               )}
             >
-              {msg.body || <span className="italic opacity-50">Media/System Message</span>}
-              <span className="text-[10px] opacity-70 self-end">
-                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
+              {/* Media Preview */}
+              {msg.messageType === 'image' && msg.mediaUrl && (
+                <Image
+                  src={msg.mediaUrl} 
+                  alt={msg.fileName ? `Image: ${msg.fileName}` : 'WhatsApp image'} 
+                  className="rounded max-w-full h-auto max-h-64 object-contain"
+                  width={400}
+                  height={400}
+                />
+              )}
+              {msg.messageType === 'video' && msg.mediaUrl && (
+                <video 
+                  src={msg.mediaUrl} 
+                  controls 
+                  className="rounded max-w-full h-auto max-h-64"
+                  aria-label={msg.fileName ? `Video: ${msg.fileName}` : 'WhatsApp video'}
+                />
+              )}
+              {msg.messageType === 'audio' && msg.mediaUrl && (
+                <audio 
+                  src={msg.mediaUrl} 
+                  controls 
+                  className="w-full"
+                  aria-label={msg.fileName ? `Audio: ${msg.fileName}` : 'WhatsApp audio'}
+                />
+              )}
+              {msg.messageType === 'sticker' && msg.mediaUrl && (
+                <Image 
+                  src={msg.mediaUrl} 
+                  alt="WhatsApp sticker" 
+                  className="rounded max-w-32 h-auto"
+                  width={128}
+                  height={128}
+                />
+              )}
+              {msg.messageType === 'document' && msg.mediaUrl && (
+                <a 
+                  href={msg.mediaUrl} 
+                  download={msg.fileName || 'document'}
+                  className="flex items-center gap-2 text-blue-500 hover:underline"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>{msg.fileName || 'Download Document'}</span>
+                </a>
+              )}
+              
+              {/* Text Body */}
+              {msg.body || (msg.messageType !== 'text' && !msg.mediaUrl && <span className="italic opacity-50">Media/System Message</span>)}
+              
+              {/* Timestamp and Delivery Status */}
+              <div className="flex items-center gap-1 text-[10px] opacity-70 self-end">
+                <span suppressHydrationWarning>
+                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {msg.fromMe && (
+                  <span className="ml-1">
+                    {msg.ackStatus === 0 && '⏱'} {/* pending */}
+                    {msg.ackStatus === 1 && '✓'} {/* sent */}
+                    {msg.ackStatus === 2 && '✓✓'} {/* delivered */}
+                    {msg.ackStatus === 3 && <span className="text-blue-400">✓✓</span>} {/* read */}
+                  </span>
+                )}
+              </div>
             </div>
           ))
         )}

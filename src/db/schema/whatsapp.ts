@@ -66,4 +66,54 @@ export const messageTable = sqliteTable("message", {
   body: text("body"),
   timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
   fromMe: integer("from_me", { mode: 'boolean' }).notNull(),
+  // Media and tracking fields
+  messageType: text("message_type").notNull().default('text'), // 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'document'
+  mediaUrl: text("media_url"), // Public path to media file
+  mediaMetadata: text("media_metadata", { mode: 'json' }), // { mimetype, size, duration, width, height, fileName, sha256 }
+  ackStatus: integer("ack_status", { mode: 'number' }).notNull().default(0), // 0=pending, 1=sent, 2=delivered, 3=read
+  fileName: text("file_name"), // Original filename for documents
+});
+
+export const reactionTable = sqliteTable("reaction", {
+  id: text("id").primaryKey(),
+  whatsappId: text("whatsapp_id")
+    .notNull()
+    .references(() => whatsappTable.id, { onDelete: "cascade" }),
+  messageId: text("message_id")
+    .notNull()
+    .references(() => messageTable.id, { onDelete: "cascade" }),
+  chatId: text("chat_id").notNull(),
+  senderId: text("sender_id").notNull(), // Who reacted
+  emoji: text("emoji").notNull(), // The reaction emoji
+  timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
+  fromMe: integer("from_me", { mode: 'boolean' }).notNull(),
+});
+
+export const pollTable = sqliteTable("poll", {
+  id: text("id").primaryKey(), // Poll message ID
+  whatsappId: text("whatsapp_id")
+    .notNull()
+    .references(() => whatsappTable.id, { onDelete: "cascade" }),
+  messageId: text("message_id")
+    .notNull()
+    .references(() => messageTable.id, { onDelete: "cascade" }),
+  chatId: text("chat_id").notNull(),
+  question: text("question").notNull(),
+  options: text("options", { mode: 'json' }).notNull(), // Array of poll options
+  allowMultipleAnswers: integer("allow_multiple_answers", { mode: 'boolean' }).notNull().default(false),
+  createdBy: text("created_by").notNull(),
+  timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const pollVoteTable = sqliteTable("poll_vote", {
+  id: text("id").primaryKey(),
+  whatsappId: text("whatsapp_id")
+    .notNull()
+    .references(() => whatsappTable.id, { onDelete: "cascade" }),
+  pollId: text("poll_id")
+    .notNull()
+    .references(() => pollTable.id, { onDelete: "cascade" }),
+  voterId: text("voter_id").notNull(), // Who voted
+  selectedOptions: text("selected_options", { mode: 'json' }).notNull(), // Array of selected option indices
+  timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
 });

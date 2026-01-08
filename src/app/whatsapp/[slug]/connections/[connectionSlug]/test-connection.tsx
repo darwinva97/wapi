@@ -45,10 +45,10 @@ export function TestConnection({ connection, whatsappSlug, connectionSlug }: Tes
   const [senderTo, setSenderTo] = useState("");
   const [senderMsg, setSenderMsg] = useState("Hola desde WAPI!");
   const [senderLoading, setSenderLoading] = useState(false);
-  const [senderResult, setSenderResult] = useState<any>(null);
+  const [senderResult, setSenderResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
 
   const [receiverLoading, setReceiverLoading] = useState(false);
-  const [receiverResult, setReceiverResult] = useState<any>(null);
+  const [receiverResult, setReceiverResult] = useState<{ success: boolean; status?: number; response?: string; error?: string } | null>(null);
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://tu-dominio.com';
   const senderEndpoint = `${baseUrl}/api/${whatsappSlug}/${connectionSlug}/sender`;
@@ -90,7 +90,7 @@ export function TestConnection({ connection, whatsappSlug, connectionSlug }: Tes
     try {
       const result = await testSenderAction(connection.id, senderTo, senderMsg);
       setSenderResult(result);
-    } catch (err) {
+    } catch {
       setSenderResult({ success: false, error: "Unexpected error" });
     } finally {
       setSenderLoading(false);
@@ -103,7 +103,7 @@ export function TestConnection({ connection, whatsappSlug, connectionSlug }: Tes
     try {
       const result = await testReceiverAction(connection.id);
       setReceiverResult(result);
-    } catch (err) {
+    } catch {
       setReceiverResult({ success: false, error: "Unexpected error" });
     } finally {
       setReceiverLoading(false);

@@ -33,7 +33,7 @@ export async function updateConnectionAction(id: string, formData: FormData) {
   if (receiverRequestStr && receiverRequestStr.trim() !== "") {
     try {
       receiverRequest = JSON.parse(receiverRequestStr);
-    } catch (e) {
+    } catch {
       throw new Error("Invalid JSON for Receiver Request Config");
     }
   }
@@ -41,7 +41,7 @@ export async function updateConnectionAction(id: string, formData: FormData) {
   if (receiverFilterStr && receiverFilterStr.trim() !== "") {
     try {
       receiverFilter = JSON.parse(receiverFilterStr);
-    } catch (e) {
+    } catch {
       throw new Error("Invalid JSON for Receiver Filter");
     }
   }

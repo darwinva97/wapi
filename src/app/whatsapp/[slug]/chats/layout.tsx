@@ -1,16 +1,10 @@
 import { db } from "@/db";
-import { whatsappTable, groupTable, contactTable, messageTable } from "@/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { groupTable, contactTable, messageTable } from "@/db/schema";
+import { eq, sql } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
 import { Suspense } from "react";
-import { ArrowLeft } from "lucide-react";
 import { getWAFromSlugUserIdCache } from "../cache";
 import { ChatList } from "./chat-list";
 

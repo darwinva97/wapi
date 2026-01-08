@@ -30,8 +30,8 @@ export default function LoginPage() {
     try {
       await signIn.email({ email, password });
       router.replace("/");
-    } catch (err: any) {
-      setError(err?.message || "Error al iniciar sesión");
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "Error al iniciar sesión");
     } finally {
       setLoading(false);
     }

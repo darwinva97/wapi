@@ -4,9 +4,11 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   WASocket,
+  downloadContentFromMessage,
+  proto,
 } from "baileys";
 import { db } from "@/db";
-import { whatsappTable, connectionTable, contactTable, groupTable, messageTable } from "@/db/schema";
+import { whatsappTable, connectionTable, contactTable, groupTable, messageTable, reactionTable, pollTable, pollVoteTable } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import pino from "pino";
 import fs from "fs";
@@ -14,6 +16,7 @@ import path from "path";
 import crypto from "crypto";
 import { EventEmitter } from "events";
 import { normalizeContactData, isGroup, extractLidAndPn, isOwnContact, isOwnChat, extractMessageText } from "./whatsapp-utils";
+import { downloadAndSaveMedia, MediaMetadata } from "./media";
 
 // Track sessions that are currently connecting to prevent duplicate connections
 const connectingLocks = new Set<string>();
@@ -31,8 +34,8 @@ function clearCorruptedSession(whatsappId: string): void {
 }
 
 // Check if error is a session/encryption error that requires session reset
-function isSessionCorruptionError(error: any): boolean {
-  const errorMessage = error?.message || error?.toString() || "";
+function isSessionCorruptionError(error: unknown): boolean {
+  const errorMessage = (error as Error)?.message || error?.toString() || "";
   const corruptionIndicators = [
     "Bad MAC",
     "decryption failed",
@@ -47,9 +50,9 @@ function isSessionCorruptionError(error: any): boolean {
   );
 }
 
-export const whatsappEvents = (global as any).whatsappEvents || new EventEmitter();
+export const whatsappEvents = (global as Record<string, unknown>).whatsappEvents as EventEmitter || new EventEmitter();
 if (process.env.NODE_ENV !== "production") {
-  (global as any).whatsappEvents = whatsappEvents;
+  (global as Record<string, unknown>).whatsappEvents = whatsappEvents;
 }
 
 // Global map to store active connections
@@ -74,6 +77,107 @@ if (!fs.existsSync(SESSIONS_DIR)) {
   fs.mkdirSync(SESSIONS_DIR);
 }
 
+// Acknowledgment status constants
+const ACK_STATUS = {
+  PENDING: 0,
+  SENT: 1,
+  DELIVERED: 2,
+  READ: 3,
+} as const;
+
+// Helper to detect message type and extract metadata
+function detectMessageType(message: proto.IMessage | null | undefined): {
+  type: 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'document';
+  metadata: Partial<MediaMetadata>;
+  messageContent: proto.IMessage[keyof proto.IMessage] | null;
+} {
+  if (!message) {
+    return { type: 'text', metadata: {}, messageContent: null };
+  }
+
+  if (message.imageMessage) {
+    return {
+      type: 'image',
+      metadata: {
+        mimetype: message.imageMessage.mimetype || undefined,
+        width: message.imageMessage.width || undefined,
+        height: message.imageMessage.height || undefined,
+        fileName: 'image.jpg',
+      },
+      messageContent: message.imageMessage,
+    };
+  }
+
+  if (message.videoMessage) {
+    return {
+      type: 'video',
+      metadata: {
+        mimetype: message.videoMessage.mimetype || undefined,
+        duration: message.videoMessage.seconds || undefined,
+        width: message.videoMessage.width || undefined,
+        height: message.videoMessage.height || undefined,
+        fileName: 'video.mp4',
+      },
+      messageContent: message.videoMessage,
+    };
+  }
+
+  if (message.audioMessage) {
+    return {
+      type: 'audio',
+      metadata: {
+        mimetype: message.audioMessage.mimetype || undefined,
+        duration: message.audioMessage.seconds || undefined,
+        fileName: 'audio.ogg',
+      },
+      messageContent: message.audioMessage,
+    };
+  }
+
+  if (message.stickerMessage) {
+    return {
+      type: 'sticker',
+      metadata: {
+        mimetype: message.stickerMessage.mimetype || undefined,
+        width: message.stickerMessage.width || undefined,
+        height: message.stickerMessage.height || undefined,
+        fileName: 'sticker.webp',
+      },
+      messageContent: message.stickerMessage,
+    };
+  }
+
+  if (message.documentMessage) {
+    return {
+      type: 'document',
+      metadata: {
+        mimetype: message.documentMessage.mimetype || undefined,
+        fileName: message.documentMessage.fileName || 'document',
+      },
+      messageContent: message.documentMessage,
+    };
+  }
+
+  return { type: 'text', metadata: {}, messageContent: null };
+}
+
+// Helper to download media from message
+async function downloadMediaFromMessage(messageContent: proto.IMessage[keyof proto.IMessage], messageType: string): Promise<Buffer | null> {
+  try {
+    const stream = await downloadContentFromMessage(messageContent as never, messageType as never);
+    
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    
+    return Buffer.concat(chunks);
+  } catch (error) {
+    console.error("[Media] Error downloading media:", error);
+    return null;
+  }
+}
+
 export async function connectToWhatsApp(whatsappId: string) {
   // Prevent duplicate connections
   if (sessions.has(whatsappId)) {
@@ -91,16 +195,17 @@ export async function connectToWhatsApp(whatsappId: string) {
 
   try {
     const sessionPath = path.join(SESSIONS_DIR, whatsappId);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
     const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
       version,
-      logger: pino({ level: "silent" }) as any,
+      logger: pino({ level: "silent" }),
       printQRInTerminal: false,
       auth: {
         creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" }) as any),
+        keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
       },
       generateHighQualityLinkPreview: true,
     });
@@ -109,7 +214,8 @@ export async function connectToWhatsApp(whatsappId: string) {
     connectingLocks.delete(whatsappId);
 
     // Global error handler for session corruption errors
-    sock.ev.on("error" as any, (error: any) => {
+    sock.ev.on("error" as never, (error: unknown) => {
+      console.log(`[Event] error triggered for ${whatsappId}`);
       console.error(`[Session] Socket error for ${whatsappId}:`, error);
       if (isSessionCorruptionError(error)) {
         console.log(`[Session] Detected session corruption, clearing session...`);
@@ -121,9 +227,13 @@ export async function connectToWhatsApp(whatsappId: string) {
       }
     });
 
-    sock.ev.on("creds.update", saveCreds);
+    sock.ev.on("creds.update", () => {
+      console.log(`[Event] creds.update triggered for ${whatsappId}`);
+      saveCreds();
+    });
 
   sock.ev.on("contacts.upsert", async (contacts) => {
+    console.log(`[Event] contacts.upsert triggered for ${whatsappId} - ${contacts.length} contacts`);
     const user = sock.user;
     const phoneNumber = user?.id?.split(":")[0] || user?.id?.split("@")[0];
 
@@ -186,6 +296,7 @@ export async function connectToWhatsApp(whatsappId: string) {
 
   // Handle groups.upsert event - triggered when groups are added or updated
   sock.ev.on("groups.upsert", async (groups) => {
+    console.log(`[Event] groups.upsert triggered for ${whatsappId} - ${groups.length} groups`);
     console.log(`[groups.upsert] Received ${groups.length} groups for ${whatsappId}`);
     for (const group of groups) {
       try {
@@ -225,6 +336,7 @@ export async function connectToWhatsApp(whatsappId: string) {
 
   // Handle groups.update event - triggered when group metadata changes
   sock.ev.on("groups.update", async (updates) => {
+    console.log(`[Event] groups.update triggered for ${whatsappId} - ${updates.length} updates`);
     console.log(`[groups.update] Received ${updates.length} group updates for ${whatsappId}`);
     for (const update of updates) {
       if (!update.id) continue;
@@ -252,10 +364,13 @@ export async function connectToWhatsApp(whatsappId: string) {
   });
 
   sock.ev.on("chats.upsert", async (chats) => {
+    console.log(`[Event] chats.upsert triggered for ${whatsappId} - ${chats.length} chats`);
     const user = sock.user;
     const phoneNumber = user?.id?.split(":")[0] || user?.id?.split("@")[0];
 
     for (const chat of chats) {
+      console.log(chat);
+
       if (!chat.id || chat.id.includes("@broadcast")) continue;
       if (isOwnChat(chat.id, phoneNumber || "")) continue;
 
@@ -288,19 +403,23 @@ export async function connectToWhatsApp(whatsappId: string) {
         // Contact logic (update pushName if exists)
         const { lid, pn } = extractLidAndPn(chat.id);
         
+        // Validate lid and pn formats
+        const validLid = lid && lid.includes('@lid') ? lid : null;
+        const validPn = pn && pn.includes('@s.whatsapp.net') ? pn : null;
+        
         let existing;
-        if (lid && !lid.includes("unknown")) {
+        if (validLid) {
           existing = await db.query.contactTable.findFirst({
             where: and(
               eq(contactTable.whatsappId, whatsappId),
-              eq(contactTable.lid, lid)
+              eq(contactTable.lid, validLid)
             )
           });
-        } else if (pn && !pn.includes("unknown")) {
+        } else if (validPn) {
           existing = await db.query.contactTable.findFirst({
             where: and(
               eq(contactTable.whatsappId, whatsappId),
-              eq(contactTable.pn, pn)
+              eq(contactTable.pn, validPn)
             )
           });
         }
@@ -319,30 +438,288 @@ export async function connectToWhatsApp(whatsappId: string) {
   });
 
   sock.ev.on("messages.upsert", async (m) => {
+    console.log(`[Event] messages.upsert triggered for ${whatsappId} - ${m.messages.length} messages - type: ${m.type}`);
     // Save messages to DB
     try {
       for (const msg of m.messages) {
         if (!msg.key.remoteJid) continue;
+        console.log(msg);
         
-        const body = extractMessageText(msg.message);
-
-        const isGroupChat = isGroup(msg.key.remoteJid);
-
+        // Calculate timestamp and senderId first (needed for reactions and polls)
         const timestamp = typeof msg.messageTimestamp === 'number' 
           ? new Date(msg.messageTimestamp * 1000)
-          : new Date((msg.messageTimestamp as any)?.toNumber?.() * 1000 || Date.now());
+          : new Date(((msg.messageTimestamp as { toNumber?: () => number })?.toNumber?.() || 0) * 1000 || Date.now());
+        
+        const senderId = msg.key.participant || msg.key.remoteJid;
+        
+        // Skip non-message actions (reactions, polls, etc.)
+        if (msg.message?.reactionMessage) {
+          console.log(`[messages.upsert] Processing reaction from ${senderId}`);
+          
+          try {
+            const reaction = msg.message.reactionMessage;
+            const targetMessageId = reaction.key?.id;
+            
+            if (targetMessageId) {
+              // Check if this is removing a reaction (empty emoji)
+              if (!reaction.text || reaction.text === '') {
+                // Delete the reaction
+                await db.delete(reactionTable).where(
+                  and(
+                    eq(reactionTable.whatsappId, whatsappId),
+                    eq(reactionTable.messageId, targetMessageId),
+                    eq(reactionTable.senderId, senderId)
+                  )
+                );
+                console.log(`[reactions] Removed reaction from message ${targetMessageId}`);
+              } else {
+                // Add or update reaction
+                await db.insert(reactionTable).values({
+                  id: msg.key.id || crypto.randomUUID(),
+                  whatsappId,
+                  messageId: targetMessageId,
+                  chatId: msg.key.remoteJid,
+                  senderId: senderId,
+                  emoji: reaction.text,
+                  timestamp: timestamp,
+                  fromMe: msg.key.fromMe || false,
+                }).onConflictDoUpdate({
+                  target: reactionTable.id,
+                  set: {
+                    emoji: reaction.text,
+                    timestamp: timestamp,
+                  }
+                });
+                console.log(`[reactions] Saved reaction ${reaction.text} to message ${targetMessageId}`);
+              }
+            }
+          } catch (e) {
+            console.error("[reactions] Error processing reaction:", e);
+          }
+          
+          continue;
+        }
+        
+        if (msg.message?.pollUpdateMessage) {
+          console.log(`[messages.upsert] Processing poll vote from ${senderId}`);
+          
+          try {
+            const pollUpdate = msg.message.pollUpdateMessage;
+            const pollMessageId = pollUpdate.pollCreationMessageKey?.id;
+            
+            if (pollMessageId && pollUpdate.vote) {
+              // Find the poll
+              const poll = await db.query.pollTable.findFirst({
+                where: and(
+                  eq(pollTable.whatsappId, whatsappId),
+                  eq(pollTable.messageId, pollMessageId)
+                )
+              });
+              
+              if (poll) {
+                // Extract selected options - handle encrypted vote data
+                const selectedOptions = (pollUpdate.vote as { selectedOptions?: number[] })?.selectedOptions || [];
+                
+                // Save the vote
+                await db.insert(pollVoteTable).values({
+                  id: msg.key.id || crypto.randomUUID(),
+                  whatsappId,
+                  pollId: poll.id,
+                  voterId: senderId,
+                  selectedOptions: selectedOptions,
+                  timestamp: timestamp,
+                }).onConflictDoUpdate({
+                  target: pollVoteTable.id,
+                  set: {
+                    selectedOptions: selectedOptions,
+                    timestamp: timestamp,
+                  }
+                });
+                console.log(`[polls] Saved vote for poll ${pollMessageId}`);
+              }
+            }
+          } catch (e) {
+            console.error("[polls] Error processing poll vote:", e);
+          }
+          
+          continue;
+        }
+        
+        if (msg.message?.pollCreationMessage) {
+          console.log(`[messages.upsert] Poll creation detected - will be saved as message`);
+          // The poll message will be saved as a regular message below,
+          // but we also create a poll entry for tracking votes
+        }
+        
+        const body = extractMessageText(msg.message);
+        const isGroupChat = isGroup(msg.key.remoteJid);
+        
+        // Check and create contact if sender doesn't exist and it's not own message
+        if (!msg.key.fromMe && senderId && !senderId.includes('@g.us') && !senderId.includes('@broadcast')) {
+          const user = sock.user;
+          const ownPhoneNumber = user?.id?.split(":")[0] || user?.id?.split("@")[0];
+          
+          // Extract lid and pn using utility function
+          const { lid, pn } = extractLidAndPn(senderId);
+          
+          // Determine correct lid and pn values (only valid ones)
+          const validLid: string | null = lid && lid.includes('@lid') ? lid : null;
+          const validPn: string | null = pn && pn.includes('@s.whatsapp.net') ? pn : null;
+          
+          // Skip if it's own contact
+          if (!isOwnContact(validLid, validPn, ownPhoneNumber || "")) {
+            // Check if contact exists by lid or pn
+            let existingContact;
+            
+            if (validLid) {
+              existingContact = await db.query.contactTable.findFirst({
+                where: and(
+                  eq(contactTable.whatsappId, whatsappId),
+                  eq(contactTable.lid, validLid)
+                )
+              });
+            }
+            
+            if (!existingContact && validPn) {
+              existingContact = await db.query.contactTable.findFirst({
+                where: and(
+                  eq(contactTable.whatsappId, whatsappId),
+                  eq(contactTable.pn, validPn)
+                )
+              });
+            }
+            
+            if (existingContact) {
+              // Update contact if we have better information
+              const shouldUpdate = 
+                (validLid && existingContact.lid !== validLid && (!existingContact.lid || !existingContact.lid.includes('@lid'))) ||
+                (validPn && existingContact.pn !== validPn && (!existingContact.pn || !existingContact.pn.includes('@s.whatsapp.net')));
+              
+              if (shouldUpdate) {
+                try {
+                  const updateData: Partial<{ lid: string; pn: string }> = {};
+                  if (validLid && (!existingContact.lid || !existingContact.lid.includes('@lid'))) {
+                    updateData.lid = validLid;
+                  }
+                  if (validPn && (!existingContact.pn || !existingContact.pn.includes('@s.whatsapp.net'))) {
+                    updateData.pn = validPn;
+                  }
+                  
+                  if (Object.keys(updateData).length > 0) {
+                    await db.update(contactTable)
+                      .set(updateData)
+                      .where(eq(contactTable.id, existingContact.id));
+                    console.log(`[messages.upsert] Updated contact with correct values: ${existingContact.name} - lid: ${updateData.lid || 'unchanged'}, pn: ${updateData.pn || 'unchanged'}`);
+                  }
+                } catch (e) {
+                  console.error(`[messages.upsert] Error updating contact:`, e);
+                }
+              }
+            } else {
+              // Create new contact only if we have valid lid or pn
+              if (validLid || validPn) {
+                try {
+                  const pushName = (msg as { pushName?: string }).pushName || validPn?.split('@')[0] || validLid?.split('@')[0] || 'Unknown';
+                  
+                  await db.insert(contactTable).values({
+                    id: crypto.randomUUID(),
+                    whatsappId,
+                    name: pushName,
+                    pushName: pushName,
+                    lid: validLid || "",
+                    pn: validPn || "",
+                    description: "",
+                  });
+                  
+                  console.log(`[messages.upsert] Created new contact from message: ${pushName} - lid: ${validLid || 'empty'}, pn: ${validPn || 'empty'}`);
+                } catch (e) {
+                  console.error(`[messages.upsert] Error creating contact for sender ${senderId}:`, e);
+                }
+              }
+            }
+          }
+        }
+
+        // Detect message type and extract metadata
+        const { type: messageType, metadata, messageContent } = detectMessageType(msg.message);
+        
+        let mediaUrl: string | null = null;
+        let mediaMetadata: Partial<MediaMetadata> | null = null;
+        let fileName: string | null = null;
+        
+        // Download and save media if present
+        if (messageType !== 'text' && messageContent) {
+          try {
+            console.log(`[Media] Downloading ${messageType} for message ${msg.key.id}`);
+            
+            const buffer = await downloadMediaFromMessage(messageContent, messageType);
+            
+            if (buffer) {
+              // Use original filename from metadata, or generate one
+              const sanitizedFilename = metadata.fileName || `${messageType}_${msg.key.id}`;
+              fileName = metadata.fileName || null; // Store original filename separately
+              
+              const saveResult = await downloadAndSaveMedia(
+                buffer,
+                sanitizedFilename,
+                whatsappId,
+                msg.key.id || crypto.randomUUID(),
+                metadata
+              );
+              
+              mediaUrl = saveResult.url;
+              mediaMetadata = saveResult.metadata;
+              
+              console.log(`[Media] Saved ${messageType} to ${mediaUrl}`);
+            }
+          } catch (mediaError) {
+            console.error(`[Media] Failed to download ${messageType}:`, mediaError);
+            // Continue without media on error
+            mediaMetadata = metadata;
+          }
+        }
+
+        // Determine initial ackStatus
+        // fromMe messages start as sent (1), incoming messages are delivered (2)
+        const ackStatus = msg.key.fromMe ? ACK_STATUS.SENT : ACK_STATUS.DELIVERED;
 
         await db.insert(messageTable).values({
           id: msg.key.id || crypto.randomUUID(),
           whatsappId,
           chatId: msg.key.remoteJid,
           chatType: isGroupChat ? 'group' : 'personal',
-          senderId: msg.key.participant || msg.key.remoteJid,
+          senderId: senderId,
           content: msg,
           body: body,
           timestamp: timestamp,
           fromMe: msg.key.fromMe || false,
+          messageType,
+          mediaUrl,
+          mediaMetadata: mediaMetadata ? JSON.stringify(mediaMetadata) : null,
+          ackStatus,
+          fileName,
         }).onConflictDoNothing();
+
+        // If this is a poll creation, also save poll data
+        if (msg.message?.pollCreationMessage) {
+          try {
+            const pollMsg = msg.message.pollCreationMessage;
+            await db.insert(pollTable).values({
+              id: crypto.randomUUID(),
+              whatsappId,
+              messageId: msg.key.id || crypto.randomUUID(),
+              chatId: msg.key.remoteJid,
+              question: pollMsg.name || "Poll",
+              options: pollMsg.options?.map(opt => opt.optionName) || [],
+              allowMultipleAnswers: pollMsg.selectableOptionsCount ? pollMsg.selectableOptionsCount > 1 : false,
+              createdBy: msg.key.participant || msg.key.remoteJid,
+              timestamp: timestamp,
+            }).onConflictDoNothing();
+            console.log(`[polls] Saved poll data for message ${msg.key.id}`);
+          } catch (e) {
+            console.error("[polls] Error saving poll data:", e);
+          }
+        }
 
         // Emit event for real-time updates
         whatsappEvents.emit(`new-message-${msg.key.remoteJid}`, {
@@ -350,10 +727,15 @@ export async function connectToWhatsApp(whatsappId: string) {
           body,
           timestamp: timestamp,
           fromMe: msg.key.fromMe || false,
-          senderId: msg.key.participant || msg.key.remoteJid,
+          senderId: senderId,
+          messageType,
+          mediaUrl,
+          mediaMetadata,
+          ackStatus,
+          fileName,
         });
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error saving messages to DB:", e);
       
       // Check for session corruption errors
@@ -403,7 +785,67 @@ export async function connectToWhatsApp(whatsappId: string) {
     }
   });
 
+  // Handle message status updates (ack: delivery receipts, read receipts)
+  sock.ev.on("messages.update", async (updates) => {
+    console.log(`[Event] messages.update triggered for ${whatsappId} - ${updates.length} updates`);
+    try {
+      for (const update of updates) {
+        const { key, update: statusUpdate } = update;
+        
+        if (!key.id || !key.remoteJid) continue;
+        
+        // Map Baileys status to our ackStatus
+        // status: 0 = pending/error, 1 = server ack, 2 = delivered, 3 = read
+        let newAckStatus: number | undefined;
+        
+        if (statusUpdate.status !== undefined) {
+          // Direct status from Baileys
+          if (statusUpdate.status === 0) newAckStatus = ACK_STATUS.PENDING;
+          else if (statusUpdate.status === 1) newAckStatus = ACK_STATUS.SENT;
+          else if (statusUpdate.status === 2) newAckStatus = ACK_STATUS.DELIVERED;
+          else if (statusUpdate.status === 3) newAckStatus = ACK_STATUS.READ;
+        }
+        
+        // Check for read receipt (handle different possible property names)
+        if ((statusUpdate as { readTimestamp?: unknown }).readTimestamp || (statusUpdate as { read?: unknown }).read) {
+          newAckStatus = ACK_STATUS.READ;
+        }
+        
+        if (newAckStatus !== undefined) {
+          console.log(`[Ack] Updating message ${key.id} to status ${newAckStatus}`);
+          
+          // Update database
+          await db.update(messageTable)
+            .set({ ackStatus: newAckStatus })
+            .where(
+              and(
+                eq(messageTable.id, key.id),
+                eq(messageTable.whatsappId, whatsappId)
+              )
+            );
+          
+          // Emit SSE event for real-time update
+          whatsappEvents.emit(`message-ack-${key.id}`, {
+            messageId: key.id,
+            chatId: key.remoteJid,
+            ackStatus: newAckStatus,
+          });
+          
+          // Also emit to chat channel for UI updates
+          whatsappEvents.emit(`new-message-${key.remoteJid}`, {
+            id: key.id,
+            ackStatus: newAckStatus,
+            isAckUpdate: true,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("[Ack] Error updating message status:", error);
+    }
+  });
+
   sock.ev.on("connection.update", async (update) => {
+    console.log(`[Event] connection.update triggered for ${whatsappId} - status: ${update.connection}`);
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
@@ -413,7 +855,7 @@ export async function connectToWhatsApp(whatsappId: string) {
     }
 
     if (connection === "close") {
-      const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
+      const statusCode = (lastDisconnect?.error as { output?: { statusCode?: number } })?.output?.statusCode;
       const errorMessage = lastDisconnect?.error?.message || "";
       const isLoggedOut = statusCode === DisconnectReason.loggedOut;
       const isSessionCorrupted = isSessionCorruptionError(lastDisconnect?.error);
@@ -517,7 +959,7 @@ export async function connectToWhatsApp(whatsappId: string) {
   });
 
   return sock;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`[Session] Error connecting WhatsApp ${whatsappId}:`, error);
     connectingLocks.delete(whatsappId);
     
