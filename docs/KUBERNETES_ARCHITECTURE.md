@@ -293,7 +293,7 @@ kubectl describe pod -n wapi -l app=wapi
 ```
 ┌─────────────┐    ┌──────────────┐    ┌─────────────┐    ┌──────────────┐
 │   Git Push  │ -> │  Build Image │ -> │ Push to ECR │ -> │ Update K8s   │
-│  to main    │    │  (Docker)    │    │ / GCR / etc │    │  Deployment  │
+│  to master    │    │  (Docker)    │    │ / GCR / etc │    │  Deployment  │
 └─────────────┘    └──────────────┘    └─────────────┘    └──────────────┘
                            │                                       │
                            ▼                                       ▼
