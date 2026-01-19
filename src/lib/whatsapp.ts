@@ -50,24 +50,29 @@ function isSessionCorruptionError(error: unknown): boolean {
   );
 }
 
-export const whatsappEvents = (global as Record<string, unknown>).whatsappEvents as EventEmitter || new EventEmitter();
-if (process.env.NODE_ENV !== "production") {
-  (global as Record<string, unknown>).whatsappEvents = whatsappEvents;
-}
-
 // Global map to store active connections
 // In a production environment with multiple instances, this needs Redis or similar.
 // For a single instance Next.js server, this global works (but beware of HMR in dev).
 const globalForWhatsapp = global as unknown as { 
   whatsappSessions: Map<string, WASocket>,
-  whatsappQrs: Map<string, string> 
+  whatsappQrs: Map<string, string>,
+  whatsappEvents: EventEmitter
 };
+
+if (!globalForWhatsapp.whatsappEvents) {
+  globalForWhatsapp.whatsappEvents = new EventEmitter();
+  globalForWhatsapp.whatsappEvents.setMaxListeners(100);
+}
+
+export const whatsappEvents = globalForWhatsapp.whatsappEvents;
 
 const sessions = globalForWhatsapp.whatsappSessions || new Map<string, WASocket>();
 const qrs = globalForWhatsapp.whatsappQrs || new Map<string, string>();
 
-if (process.env.NODE_ENV !== "production") {
+if (!globalForWhatsapp.whatsappSessions) {
   globalForWhatsapp.whatsappSessions = sessions;
+}
+if (!globalForWhatsapp.whatsappQrs) {
   globalForWhatsapp.whatsappQrs = qrs;
 }
 
@@ -987,14 +992,15 @@ export async function disconnectWhatsApp(whatsappId: string) {
     sessions.delete(whatsappId);
     qrs.delete(whatsappId);
     connectingLocks.delete(whatsappId);
+  }
 
-    try {
-      await db.update(whatsappTable)
-        .set({ connected: false })
-        .where(eq(whatsappTable.id, whatsappId));
-    } catch (e) {
-      console.error("Error updating DB on disconnect:", e);
-    }
+  // Always update DB, even if socket wasn't in memory
+  try {
+    await db.update(whatsappTable)
+      .set({ connected: false })
+      .where(eq(whatsappTable.id, whatsappId));
+  } catch (e) {
+    console.error("Error updating DB on disconnect:", e);
   }
 }
 
@@ -1031,4 +1037,81 @@ export function getQr(whatsappId: string) {
 // Check if a session is currently connecting
 export function isConnecting(whatsappId: string) {
   return connectingLocks.has(whatsappId);
+}
+
+// Check real connection state and sync with DB
+export async function syncConnectionState(whatsappId: string): Promise<{
+  isConnected: boolean;
+  wasOutOfSync: boolean;
+}> {
+  const sock = sessions.get(whatsappId);
+  
+  // Check real connection state
+  // A socket exists and user is defined means it's truly connected
+  const isReallyConnected = !!(sock && sock.user);
+  
+  // Get DB state
+  const dbRecord = await db.query.whatsappTable.findFirst({
+    where: eq(whatsappTable.id, whatsappId),
+    columns: { connected: true }
+  });
+  
+  const dbConnected = dbRecord?.connected ?? false;
+  const wasOutOfSync = dbConnected !== isReallyConnected;
+  
+  // Sync if out of sync
+  if (wasOutOfSync) {
+    console.log(`[Sync] State mismatch for ${whatsappId}: DB=${dbConnected}, Real=${isReallyConnected}. Syncing...`);
+    try {
+      await db.update(whatsappTable)
+        .set({ connected: isReallyConnected })
+        .where(eq(whatsappTable.id, whatsappId));
+    } catch (e) {
+      console.error("Error syncing connection state:", e);
+    }
+  }
+  
+  return { isConnected: isReallyConnected, wasOutOfSync };
+}
+
+// Sync all WhatsApp connections state with DB
+export async function syncAllConnectionStates(): Promise<void> {
+  console.log("[Sync] Starting sync of all connection states...");
+  
+  try {
+    const allWhatsapps = await db.query.whatsappTable.findMany({
+      columns: { id: true, connected: true }
+    });
+    
+    for (const wa of allWhatsapps) {
+      await syncConnectionState(wa.id);
+    }
+    
+    console.log(`[Sync] Completed sync for ${allWhatsapps.length} accounts`);
+  } catch (e) {
+    console.error("[Sync] Error syncing all connection states:", e);
+  }
+}
+
+// Periodic sync interval (runs every 30 seconds)
+let syncInterval: ReturnType<typeof setInterval> | null = null;
+
+export function startPeriodicSync(intervalMs: number = 30000): void {
+  if (syncInterval) {
+    console.log("[Sync] Periodic sync already running");
+    return;
+  }
+  
+  console.log(`[Sync] Starting periodic sync every ${intervalMs}ms`);
+  syncInterval = setInterval(() => {
+    syncAllConnectionStates().catch(console.error);
+  }, intervalMs);
+}
+
+export function stopPeriodicSync(): void {
+  if (syncInterval) {
+    clearInterval(syncInterval);
+    syncInterval = null;
+    console.log("[Sync] Periodic sync stopped");
+  }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { testSenderAction, testReceiverAction } from "./test-actions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,12 @@ export function TestConnection({ connection, whatsappSlug, connectionSlug }: Tes
   const [receiverLoading, setReceiverLoading] = useState(false);
   const [receiverResult, setReceiverResult] = useState<{ success: boolean; status?: number; response?: string; error?: string } | null>(null);
 
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://tu-dominio.com';
+  const [baseUrl, setBaseUrl] = useState('');
+
+  useEffect(() => {
+    setBaseUrl(window.location.origin);
+  }, []);
+
   const senderEndpoint = `${baseUrl}/api/${whatsappSlug}/${connectionSlug}/sender`;
 
   const curlExample = `curl -X POST "${senderEndpoint}" \\

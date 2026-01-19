@@ -49,39 +49,32 @@ async function ConnectionLayout({
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-auto -m-8 -mb-4">
-      <div className="p-8 pb-4">
-        <div className="mx-auto max-w-7xl space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" asChild>
-                <Link href={`/whatsapp/${wa.slug}`}>
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
-              </Button>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-              {connection.name}
-            </h1>
-            <div className="flex gap-2">
-              <Badge variant={connection.receiverEnabled ? 'default' : 'secondary'}>
-                Receiver: {connection.receiverEnabled ? 'ON' : 'OFF'}
-              </Badge>
-              <Badge variant={connection.senderEnabled ? 'default' : 'secondary'}>
-                Sender: {connection.senderEnabled ? 'ON' : 'OFF'}
-              </Badge>
-            </div>
+    <div className="p-8 pb-4">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* Header row with back button, title, badges, and edit button */}
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild className="shrink-0">
+            <Link href={`/whatsapp/${wa.slug}`}>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-lg font-semibold truncate">{connection.name}</span>
+            <Badge variant={connection.receiverEnabled ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0 shrink-0">
+              Receiver: {connection.receiverEnabled ? 'ON' : 'OFF'}
+            </Badge>
+            <Badge variant={connection.senderEnabled ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0 shrink-0">
+              Sender: {connection.senderEnabled ? 'ON' : 'OFF'}
+            </Badge>
           </div>
-          <div className="flex gap-2">
-            <Button asChild>
-              <Link href={`/whatsapp/${wa.slug}/connections/${connection.slug}/edit`}>
-                <Edit className="mr-2 h-4 w-4" /> Editar
-              </Link>
-            </Button>
-          </div>
+          <Button size="sm" asChild className="shrink-0">
+            <Link href={`/whatsapp/${wa.slug}/connections/${connection.slug}/edit`}>
+              <Edit className="mr-2 h-3 w-3" /> Editar
+            </Link>
+          </Button>
         </div>
 
         {children}
-        </div>
       </div>
     </div>
   );

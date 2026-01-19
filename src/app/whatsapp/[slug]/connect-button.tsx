@@ -1,22 +1,57 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { connectWhatsappAction, disconnectWhatsappAction } from "./actions";
+import { connectWhatsappAction, disconnectWhatsappAction, syncConnectionStateAction } from "./actions";
 import { QRCodeSVG } from "qrcode.react";
 import { useRouter } from "next/navigation";
 
-export function ConnectButton({ id, isConnected }: { id: string, isConnected: boolean }) {
+export function ConnectButton({ id, isConnected: initialIsConnected }: { id: string, isConnected: boolean }) {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("idle");
   const [mounted, setMounted] = useState(false);
+  const [isConnected, setIsConnected] = useState(initialIsConnected);
   const router = useRouter();
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Sync connection state on mount and periodically
+  useEffect(() => {
+    let isMounted = true;
+
+    const syncState = async () => {
+      try {
+        const result = await syncConnectionStateAction(id);
+        if (isMounted && result.isConnected !== isConnected) {
+          setIsConnected(result.isConnected);
+          if (result.wasOutOfSync) {
+            router.refresh();
+          }
+        }
+      } catch (error) {
+        console.error("Error syncing state:", error);
+      }
+    };
+
+    // Initial sync
+    syncState();
+
+    // Periodic sync every 10 seconds
+    const interval = setInterval(syncState, 10000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, [id]); // Only depend on id, not isConnected
 
   async function handleConnect() {
     setLoading(true);

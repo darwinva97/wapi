@@ -54,3 +54,5 @@ backups/
 
 # Docker
 docker-compose.override.yml
+
+public/media/*
