@@ -39,6 +39,7 @@ import {
   type ChatLink,
   type ChatAsset,
   type ChatNote,
+  type ContactInfo,
 } from "./chat-info-actions";
 
 interface ChatInfoPanelProps {
@@ -157,15 +158,11 @@ export function ChatInfoPanel({
                   <h4 className="font-medium mb-3">Información General</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Nombre</span>
-                      <span>{chatName}</span>
-                    </div>
-                    <div className="flex justify-between">
                       <span className="text-muted-foreground">Tipo</span>
                       <span>{chatInfo.isGroup ? "Grupo" : "Personal"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">ID</span>
+                      <span className="text-muted-foreground">ID del chat</span>
                       <span className="font-mono text-xs">{chatId}</span>
                     </div>
                     {chatInfo.firstMessage && (
@@ -184,6 +181,37 @@ export function ChatInfoPanel({
                     </div>
                   </div>
                 </div>
+
+                {/* Contact Details (only for personal chats) */}
+                {!chatInfo.isGroup && chatInfo.contact && (
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-3">Datos del Contacto</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between items-start">
+                        <span className="text-muted-foreground">Nombre</span>
+                        <span className="text-right">{chatInfo.contact.name || "-"}</span>
+                      </div>
+                      <div className="flex justify-between items-start">
+                        <span className="text-muted-foreground">Push Name</span>
+                        <span className="text-right">{chatInfo.contact.pushName || "-"}</span>
+                      </div>
+                      <div className="flex justify-between items-start">
+                        <span className="text-muted-foreground shrink-0">PN (Phone)</span>
+                        <span className="font-mono text-xs text-right break-all ml-2">{chatInfo.contact.pn || "-"}</span>
+                      </div>
+                      <div className="flex justify-between items-start">
+                        <span className="text-muted-foreground shrink-0">LID</span>
+                        <span className="font-mono text-xs text-right break-all ml-2">{chatInfo.contact.lid || "-"}</span>
+                      </div>
+                      {chatInfo.contact.description && (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-muted-foreground">Descripción</span>
+                          <span className="text-xs bg-muted p-2 rounded">{chatInfo.contact.description}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="border-t pt-4">
                   <h4 className="font-medium mb-3">Configuración</h4>

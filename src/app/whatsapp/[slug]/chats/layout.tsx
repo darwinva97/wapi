@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { groupTable, contactTable, messageTable } from "@/db/schema";
+import { groupTable, contactTable, messageTable, chatConfigTable } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -37,6 +37,16 @@ async function ChatsLayout({
     where: eq(contactTable.whatsappId, whatsapp.id),
   });
 
+  // Get chat configs for custom names
+  const chatConfigs = await db.query.chatConfigTable.findMany({
+    where: eq(chatConfigTable.whatsappId, whatsapp.id),
+  });
+  const customNameMap = new Map(
+    chatConfigs
+      .filter(c => c.customName)
+      .map(c => [c.chatId, c.customName])
+  );
+
   // Get last message for each chat
   const lastMessages = await db
     .select({
@@ -53,10 +63,11 @@ async function ChatsLayout({
   );
 
   const allChats = [
-    ...groups.map(g => ({ 
-      ...g, 
-      type: 'group' as const, 
+    ...groups.map(g => ({
+      ...g,
+      type: 'group' as const,
       identifier: g.gid,
+      customName: customNameMap.get(g.gid) || null,
       lastMessage: lastMessageMap.get(g.gid)?.body || null,
       lastMessageAt: lastMessageMap.get(g.gid)?.timestamp || null,
     })),
@@ -69,10 +80,13 @@ async function ChatsLayout({
         identifier.replace('@s.whatsapp.net', ''),
       ];
       const lastMsg = jidVariants.reduce((found, jid) => found || lastMessageMap.get(jid), undefined as { body: string | null; timestamp: number } | undefined);
-      return { 
-        ...c, 
-        type: 'personal' as const, 
+      // Check for custom name with different JID formats
+      const customName = jidVariants.reduce((found, jid) => found || customNameMap.get(jid), undefined as string | null | undefined);
+      return {
+        ...c,
+        type: 'personal' as const,
         identifier,
+        customName: customName || null,
         lastMessage: lastMsg?.body || null,
         lastMessageAt: lastMsg?.timestamp || null,
       };

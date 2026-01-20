@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { contactTable, groupTable, messageTable } from "@/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { contactTable, groupTable, messageTable, reactionTable } from "@/db/schema";
+import { eq, and, asc, inArray } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -37,16 +37,44 @@ export default async function ChatPage({
   if (!whatsapp) return notFound();
 
   // Fetch messages
-  const messages = await db.query.messageTable.findMany({
+  const rawMessages = await db.query.messageTable.findMany({
     where: and(
       eq(messageTable.whatsappId, whatsapp.id),
       eq(messageTable.chatId, decodedChatId)
     ),
     orderBy: asc(messageTable.timestamp),
-  }).then(msgs => msgs.map(msg => ({
+  });
+
+  // Fetch reactions for all messages
+  const messageIds = rawMessages.map(m => m.id);
+  const reactions = messageIds.length > 0
+    ? await db.query.reactionTable.findMany({
+        where: and(
+          eq(reactionTable.whatsappId, whatsapp.id),
+          inArray(reactionTable.messageId, messageIds)
+        ),
+      })
+    : [];
+
+  // Group reactions by messageId
+  const reactionsByMessage = new Map<string, typeof reactions>();
+  for (const reaction of reactions) {
+    const existing = reactionsByMessage.get(reaction.messageId) || [];
+    existing.push(reaction);
+    reactionsByMessage.set(reaction.messageId, existing);
+  }
+
+  // Combine messages with reactions
+  const messages = rawMessages.map(msg => ({
     ...msg,
-    mediaMetadata: msg.mediaMetadata as Record<string, unknown> | undefined
-  })));
+    mediaMetadata: msg.mediaMetadata as Record<string, unknown> | undefined,
+    reactions: reactionsByMessage.get(msg.id)?.map(r => ({
+      id: r.id,
+      emoji: r.emoji,
+      senderId: r.senderId,
+      fromMe: r.fromMe,
+    })) || [],
+  }));
 
   // Fetch sender names for group messages
   const senderMap = new Map<string, string>();
@@ -140,6 +168,7 @@ export default async function ChatPage({
       <ChatMessages
         initialMessages={messages}
         chatId={decodedChatId}
+        slug={slug}
         senderNames={Object.fromEntries(senderMap)}
         isGroup={decodedChatId.includes('@g.us')}
       />

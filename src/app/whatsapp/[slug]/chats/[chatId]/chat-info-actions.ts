@@ -1,17 +1,26 @@
 'use server';
 
 import { db } from "@/db";
-import { messageTable, chatConfigTable, chatNoteTable } from "@/db/schema";
-import { eq, and, desc, asc, isNotNull, count, min } from "drizzle-orm";
+import { messageTable, chatConfigTable, chatNoteTable, contactTable } from "@/db/schema";
+import { eq, and, desc, asc, isNotNull, count, min, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getWhatsappBySlugWithRole, hasMinimumRole } from "@/lib/auth-utils";
 import { randomUUID } from "crypto";
+
+export interface ContactInfo {
+  name: string;
+  pushName: string;
+  lid: string;
+  pn: string;
+  description: string | null;
+}
 
 export interface ChatInfoData {
   isGroup: boolean;
   totalMessages: number;
   totalMedia: number;
   firstMessage: Date | null;
+  contact: ContactInfo | null;
   config: {
     customName: string | null;
     cleanupExcluded: boolean;
@@ -96,11 +105,40 @@ export async function getChatInfo(
     ),
   });
 
+  // Get contact info if not a group
+  let contact: ContactInfo | null = null;
+  if (!isGroup) {
+    // Try to find contact by pn or lid (chatId could be either format)
+    const cleanChatId = chatId.replace('@s.whatsapp.net', '');
+    const foundContact = await db.query.contactTable.findFirst({
+      where: and(
+        eq(contactTable.whatsappId, wa.id),
+        or(
+          eq(contactTable.pn, chatId),
+          eq(contactTable.pn, cleanChatId),
+          eq(contactTable.lid, chatId),
+          eq(contactTable.lid, cleanChatId)
+        )
+      ),
+    });
+
+    if (foundContact) {
+      contact = {
+        name: foundContact.name,
+        pushName: foundContact.pushName,
+        lid: foundContact.lid,
+        pn: foundContact.pn,
+        description: foundContact.description,
+      };
+    }
+  }
+
   return {
     isGroup,
     totalMessages: messageCount?.count ?? 0,
     totalMedia: mediaCount?.count ?? 0,
     firstMessage: firstMsg?.timestamp ?? null,
+    contact,
     config: config ? {
       customName: config.customName,
       cleanupExcluded: config.cleanupExcluded,

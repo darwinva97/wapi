@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Fragment } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { AudioPlayer } from "./audio-player";
+import { VideoPlayer } from "./video-player";
 
 interface Message {
   id: string;
@@ -21,6 +23,36 @@ interface Message {
 interface ChatMessagesProps {
   initialMessages: Message[];
   chatId: string;
+}
+
+// URL regex pattern
+const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/gi;
+
+// Function to render text with clickable links
+function renderTextWithLinks(text: string, fromMe: boolean) {
+  const parts = text.split(URL_REGEX);
+
+  return parts.map((part, index) => {
+    if (URL_REGEX.test(part)) {
+      URL_REGEX.lastIndex = 0;
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "underline break-all",
+            fromMe ? "text-primary-foreground/90 hover:text-primary-foreground" : "text-blue-600 hover:text-blue-800"
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return <Fragment key={index}>{part}</Fragment>;
+  });
 }
 
 export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
@@ -102,7 +134,7 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
             <div
               key={msg.id}
               className={cn(
-                "flex w-max max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm",
+                "w-fit max-w-[85%] md:max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
                 msg.fromMe
                   ? "ml-auto bg-primary text-primary-foreground"
                   : "bg-muted"
@@ -119,19 +151,17 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
                 />
               )}
               {msg.messageType === 'video' && msg.mediaUrl && (
-                <video 
-                  src={msg.mediaUrl} 
-                  controls 
-                  className="rounded max-w-full h-auto max-h-64"
-                  aria-label={msg.fileName ? `Video: ${msg.fileName}` : 'WhatsApp video'}
+                <VideoPlayer
+                  src={msg.mediaUrl}
+                  fileName={msg.fileName}
+                  fromMe={msg.fromMe}
                 />
               )}
               {msg.messageType === 'audio' && msg.mediaUrl && (
-                <audio 
-                  src={msg.mediaUrl} 
-                  controls 
-                  className="w-full"
-                  aria-label={msg.fileName ? `Audio: ${msg.fileName}` : 'WhatsApp audio'}
+                <AudioPlayer
+                  src={msg.mediaUrl}
+                  fileName={msg.fileName}
+                  fromMe={msg.fromMe}
                 />
               )}
               {msg.messageType === 'sticker' && msg.mediaUrl && (
@@ -185,7 +215,13 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
               })()}
 
               {/* Text Body */}
-              {msg.body || (msg.messageType !== 'text' && msg.messageType !== 'location' && !msg.mediaUrl && <span className="italic opacity-50">Media/System Message</span>)}
+              {msg.body ? (
+                <span>{renderTextWithLinks(msg.body, msg.fromMe)}</span>
+              ) : (
+                msg.messageType !== 'text' && msg.messageType !== 'location' && !msg.mediaUrl && (
+                  <span className="italic opacity-50">Media/System Message</span>
+                )
+              )}
               
               {/* Timestamp and Delivery Status */}
               <div className="flex items-center gap-1 text-[10px] opacity-70 self-end">

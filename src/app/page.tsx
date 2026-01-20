@@ -24,7 +24,7 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageCircle, Plus, Phone, LogOut } from "lucide-react";
+import { MessageCircle, Plus, Phone, LogOut, Users, Settings } from "lucide-react";
 
 function DashboardSkeleton() {
   return (
@@ -108,6 +108,22 @@ async function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {session.user.role === "admin" && (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/admin/users">
+                    <Users className="mr-2 h-4 w-4" />
+                    Usuarios
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/admin/platform">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Configuración
+                  </Link>
+                </Button>
+              </>
+            )}
             <Button variant="outline" size="sm" asChild>
               <Link href="/api/auth/sign-out">
                 <LogOut className="mr-2 h-4 w-4" />

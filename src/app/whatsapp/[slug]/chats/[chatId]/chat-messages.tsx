@@ -1,8 +1,24 @@
 'use client';
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition, Fragment } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { AudioPlayer } from "./audio-player";
+import { VideoPlayer } from "./video-player";
+import { SmilePlus } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { sendReactionAction } from "./chat-actions";
+
+interface Reaction {
+  id: string;
+  emoji: string;
+  senderId: string;
+  fromMe: boolean;
+}
 
 interface Message {
   id: string;
@@ -16,18 +32,67 @@ interface Message {
   ackStatus?: number;
   fileName?: string | null;
   isAckUpdate?: boolean;
+  reactions?: Reaction[];
 }
 
 interface ChatMessagesProps {
   initialMessages: Message[];
   chatId: string;
+  slug: string;
   senderNames?: Record<string, string>;
   isGroup?: boolean;
 }
 
-export function ChatMessages({ initialMessages, chatId, senderNames = {}, isGroup = false }: ChatMessagesProps) {
+// URL regex pattern
+const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/gi;
+
+// Common reaction emojis
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+// Function to render text with clickable links
+function renderTextWithLinks(text: string, fromMe: boolean) {
+  const parts = text.split(URL_REGEX);
+
+  return parts.map((part, index) => {
+    if (URL_REGEX.test(part)) {
+      // Reset regex lastIndex
+      URL_REGEX.lastIndex = 0;
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "underline break-all",
+            fromMe ? "text-primary-foreground/90 hover:text-primary-foreground" : "text-blue-600 hover:text-blue-800"
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return <Fragment key={index}>{part}</Fragment>;
+  });
+}
+
+export function ChatMessages({ initialMessages, chatId, slug, senderNames = {}, isGroup = false }: ChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [isPending, startTransition] = useTransition();
+  const [openReactionId, setOpenReactionId] = useState<string | null>(null);
+
+  const handleReaction = (messageId: string, emoji: string) => {
+    setOpenReactionId(null);
+    startTransition(async () => {
+      try {
+        await sendReactionAction(slug, chatId, messageId, emoji);
+      } catch (error) {
+        console.error('Error sending reaction:', error);
+      }
+    });
+  };
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Sync state with initialMessages when they change
@@ -117,7 +182,7 @@ export function ChatMessages({ initialMessages, chatId, senderNames = {}, isGrou
             <div
               key={msg.id}
               className={cn(
-                "flex w-max max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm",
+                "group relative w-fit max-w-[85%] md:max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
                 msg.fromMe
                   ? "ml-auto bg-primary text-primary-foreground"
                   : "bg-muted"
@@ -140,19 +205,17 @@ export function ChatMessages({ initialMessages, chatId, senderNames = {}, isGrou
                 />
               )}
               {msg.messageType === 'video' && msg.mediaUrl && (
-                <video 
-                  src={msg.mediaUrl} 
-                  controls 
-                  className="rounded max-w-full h-auto max-h-64"
-                  aria-label={msg.fileName ? `Video: ${msg.fileName}` : 'Video de WhatsApp'}
+                <VideoPlayer
+                  src={msg.mediaUrl}
+                  fileName={msg.fileName}
+                  fromMe={msg.fromMe}
                 />
               )}
               {msg.messageType === 'audio' && msg.mediaUrl && (
-                <audio 
-                  src={msg.mediaUrl} 
-                  controls 
-                  className="w-full"
-                  aria-label={msg.fileName ? `Audio: ${msg.fileName}` : 'Audio de WhatsApp'}
+                <AudioPlayer
+                  src={msg.mediaUrl}
+                  fileName={msg.fileName}
+                  fromMe={msg.fromMe}
                 />
               )}
               {msg.messageType === 'sticker' && msg.mediaUrl && (
@@ -206,8 +269,14 @@ export function ChatMessages({ initialMessages, chatId, senderNames = {}, isGrou
               })()}
 
               {/* Text Body */}
-              {msg.body || (msg.messageType !== 'text' && msg.messageType !== 'location' && !msg.mediaUrl && <span className="italic opacity-50">Media/Mensaje del sistema</span>)}
-              
+              {msg.body ? (
+                <span>{renderTextWithLinks(msg.body, msg.fromMe)}</span>
+              ) : (
+                msg.messageType !== 'text' && msg.messageType !== 'location' && !msg.mediaUrl && (
+                  <span className="italic opacity-50">Media/Mensaje del sistema</span>
+                )
+              )}
+
               {/* Timestamp and Delivery Status */}
               <div className="flex items-center gap-1 text-[10px] opacity-70 self-end">
                 <span suppressHydrationWarning>
@@ -222,6 +291,57 @@ export function ChatMessages({ initialMessages, chatId, senderNames = {}, isGrou
                   </span>
                 )}
               </div>
+
+              {/* Reactions */}
+              {msg.reactions && msg.reactions.length > 0 && (
+                <div className={cn(
+                  "flex flex-wrap gap-1 -mb-4 mt-1",
+                  msg.fromMe ? "justify-end" : "justify-start"
+                )}>
+                  {Object.entries(
+                    msg.reactions.reduce((acc, r) => {
+                      acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                      return acc;
+                    }, {} as Record<string, number>)
+                  ).map(([emoji, count]) => (
+                    <span
+                      key={emoji}
+                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-background border text-xs shadow-sm"
+                    >
+                      {emoji}
+                      {count > 1 && <span className="text-muted-foreground text-[10px]">{count}</span>}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Reaction Button */}
+              <Popover open={openReactionId === msg.id} onOpenChange={(open) => setOpenReactionId(open ? msg.id : null)}>
+                <PopoverTrigger asChild>
+                  <button
+                    className={cn(
+                      "absolute -bottom-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-background border shadow-sm hover:bg-muted",
+                      msg.fromMe ? "left-0 -translate-x-full mr-1" : "right-0 translate-x-full ml-1"
+                    )}
+                  >
+                    <SmilePlus className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2" side={msg.fromMe ? "left" : "right"}>
+                  <div className="flex gap-1">
+                    {QUICK_REACTIONS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        onClick={() => handleReaction(msg.id, emoji)}
+                        disabled={isPending}
+                        className="p-1.5 hover:bg-muted rounded transition-colors text-lg"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           ))
         )}

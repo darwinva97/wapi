@@ -17,6 +17,7 @@ interface Chat {
   identifier: string;
   description?: string | null;
   pushName?: string;
+  customName?: string | null;
   lastMessage?: string | null;
   lastMessageAt?: number | null;
   pn?: string | null;
@@ -103,6 +104,7 @@ export function ChatList({ chats, slug }: ChatListProps) {
     const query = searchQuery.toLowerCase().trim();
     return chats.filter((chat) => {
       const name = (chat.name || '').toLowerCase();
+      const customName = (chat.customName || '').toLowerCase();
       const pushName = (chat.pushName || '').toLowerCase();
       const identifier = (chat.identifier || '').toLowerCase();
       const pn = (chat.pn || '').toLowerCase();
@@ -110,6 +112,7 @@ export function ChatList({ chats, slug }: ChatListProps) {
 
       return (
         name.includes(query) ||
+        customName.includes(query) ||
         pushName.includes(query) ||
         identifier.includes(query) ||
         pn.includes(query) ||
@@ -142,7 +145,8 @@ export function ChatList({ chats, slug }: ChatListProps) {
           ) : filteredChats.map((chat) => {
           const chatPath = `/whatsapp/${slug}/chats/${encodeURIComponent(chat.identifier)}`;
           const isActive = pathname === chatPath || pathname === decodeURIComponent(chatPath);
-          
+          const displayName = chat.customName || chat.name;
+
           return (
             <Link
               key={chat.id}
@@ -153,11 +157,11 @@ export function ChatList({ chats, slug }: ChatListProps) {
               )}
             >
               <Avatar>
-                <AvatarFallback>{chat.name?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                <AvatarFallback>{displayName?.slice(0, 2).toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden min-w-0 w-full">
                 <div className="flex items-center justify-between gap-2">
-                  <MarqueeText text={chat.name} className="font-medium flex-1 min-w-0" />
+                  <MarqueeText text={displayName} className="font-medium flex-1 min-w-0" />
                   <div className="flex items-center gap-1 shrink-0">
                     {chat.type === 'group' && <Badge variant="secondary" className="text-[10px] h-4 px-1">Grupo</Badge>}
                     {chat.lastMessageAt && (
