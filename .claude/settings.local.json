@@ -7,7 +7,14 @@
       "Bash(git commit:*)",
       "Bash(pnpm run build:*)",
       "Bash(npm run build:*)",
-      "Bash(export PATH=\"$HOME/.local/share/pnpm:$PATH\")"
+      "Bash(export PATH=\"$HOME/.local/share/pnpm:$PATH\")",
+      "Bash(npm run db:generate:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)",
+      "Bash(bun add:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(grep:*)",
+      "Bash(bun run build:*)"
     ]
   }
 }

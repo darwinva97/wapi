@@ -1,22 +1,13 @@
 "use server";
 
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { whatsappTable, connectionTable } from "@/db/schema";
-import { headers } from "next/headers";
-import { eq, and } from "drizzle-orm";
+import { connectionTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
+import { getWhatsappBySlugWithRole } from "@/lib/auth-utils";
 
 export async function createConnectionAction(formData: FormData) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session) {
-    throw new Error("Unauthorized");
-  }
-
   const whatsappSlug = formData.get("whatsappSlug") as string;
   const name = formData.get("name") as string;
   const slug = formData.get("slug") as string;
@@ -28,17 +19,8 @@ export async function createConnectionAction(formData: FormData) {
     throw new Error("Missing required fields");
   }
 
-  // Verify ownership of the WhatsApp account
-  const wa = await db.query.whatsappTable.findFirst({
-    where: and(
-      eq(whatsappTable.slug, whatsappSlug),
-      eq(whatsappTable.userId, session.user.id)
-    ),
-  });
-
-  if (!wa) {
-    throw new Error("WhatsApp account not found");
-  }
+  // Require manager role to create connections
+  const { wa } = await getWhatsappBySlugWithRole(whatsappSlug, "manager");
 
   // Check if connection slug is unique
   const existingConnection = await db.query.connectionTable.findFirst({

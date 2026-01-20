@@ -18,6 +18,8 @@ import {
 	Check,
 	X,
 	ChevronsUpDown,
+	UserPlus,
+	Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { ConnectButton } from "./connect-button";
@@ -27,8 +29,8 @@ import { notFound, redirect } from "next/navigation";
 import { getWAFromSlugUserIdCache } from "./cache";
 import { Suspense } from "react";
 import { db } from "@/db";
-import { whatsappTable } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { whatsappTable, whatsappMemberTable } from "@/db/schema";
+import { eq, or, inArray } from "drizzle-orm";
 
 function SidebarItem({
 	href,
@@ -72,16 +74,33 @@ async function WhatsappLayout({
 		redirect("/login");
 	}
 
-	const wa = await getWAFromSlugUserIdCache({ slug, userId: session.user.id });
+	const wa = await getWAFromSlugUserIdCache({
+		slug,
+		userId: session.user.id,
+		isAdmin: session.user.role === "admin",
+	});
 
 	if (!wa) {
 		notFound();
 	}
 
-	// Fetch all user's WhatsApps for the dropdown
-	const allWhatsapps = await db.query.whatsappTable.findMany({
-		where: eq(whatsappTable.userId, session.user.id),
+	// Fetch all WhatsApps the user has access to (owned or member)
+	const memberInstances = await db.query.whatsappMemberTable.findMany({
+		where: eq(whatsappMemberTable.userId, session.user.id),
 	});
+	const memberWhatsappIds = memberInstances.map((m) => m.whatsappId);
+
+	const allWhatsapps =
+		memberWhatsappIds.length > 0
+			? await db.query.whatsappTable.findMany({
+					where: or(
+						eq(whatsappTable.userId, session.user.id),
+						inArray(whatsappTable.id, memberWhatsappIds)
+					),
+				})
+			: await db.query.whatsappTable.findMany({
+					where: eq(whatsappTable.userId, session.user.id),
+				});
 
 	return (
 		<div className="flex h-screen bg-background">
@@ -175,6 +194,12 @@ async function WhatsappLayout({
 						<SidebarItem href={`/whatsapp/${wa.slug}/connections/create`} icon={<Webhook className="h-4 w-4" />}>
 							New Connection
 						</SidebarItem>
+						<SidebarItem href={`/whatsapp/${wa.slug}/members`} icon={<UserPlus className="h-4 w-4" />}>
+							Members
+						</SidebarItem>
+						<SidebarItem href={`/whatsapp/${wa.slug}/settings/cleanup`} icon={<Trash2 className="h-4 w-4" />}>
+							Cleanup
+						</SidebarItem>
 						<SidebarItem href={`/whatsapp/${wa.slug}/edit`} icon={<Settings className="h-4 w-4" />}>
 							Settings
 						</SidebarItem>
@@ -201,7 +226,7 @@ async function WhatsappLayout({
 				</header>
 
 				{/* Page Content */}
-				<div className="flex-1 overflow-auto">
+				<div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
 					{children}
 				</div>
 			</div>

@@ -6,7 +6,15 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { ChatInput } from "./chat-input";
 import { ChatMessages } from "./chat-messages";
+import { ChatInfoPanel } from "./chat-info-panel";
 import { getWAFromSlugUserIdCache } from "../../cache";
+import {
+  getChatInfo,
+  getChatLinks,
+  getChatAssets,
+  getChatNotes,
+} from "./chat-info-actions";
+import { getInstanceRole, hasMinimumRole } from "@/lib/auth-utils";
 
 export default async function ChatPage({
   params,
@@ -100,21 +108,46 @@ export default async function ChatPage({
     }
   }
 
+  // Fetch chat info panel data
+  const [chatInfo, links, assets, notes] = await Promise.all([
+    getChatInfo(slug, decodedChatId),
+    getChatLinks(slug, decodedChatId),
+    getChatAssets(slug, decodedChatId),
+    getChatNotes(slug, decodedChatId),
+  ]);
+
+  // Get user's role to determine if they can manage notes
+  const role = await getInstanceRole(whatsapp.id, session.user.id);
+  const canManageNotes = role !== null;
+
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
-      <div className="p-4 border-b bg-background shrink-0">
-        <h3 className="font-semibold">{chatName}</h3>
-        <p className="text-xs text-muted-foreground font-mono">{decodedChatId}</p>
+    <div className="flex flex-col h-full max-h-full min-h-0 overflow-hidden">
+      {/* Sticky Header */}
+      <div className="shrink-0 sticky top-0 z-10 bg-background">
+        <ChatInfoPanel
+          slug={slug}
+          chatId={decodedChatId}
+          chatName={chatName}
+          chatInfo={chatInfo}
+          links={links}
+          assets={assets}
+          notes={notes}
+          canManageNotes={canManageNotes}
+        />
       </div>
-      
-      <ChatMessages 
-        initialMessages={messages} 
+
+      {/* Scrollable Messages */}
+      <ChatMessages
+        initialMessages={messages}
         chatId={decodedChatId}
         senderNames={Object.fromEntries(senderMap)}
         isGroup={decodedChatId.includes('@g.us')}
       />
-      
-      <ChatInput slug={slug} chatId={decodedChatId} />
+
+      {/* Sticky Input at Bottom */}
+      <div className="shrink-0 sticky bottom-0 bg-background">
+        <ChatInput slug={slug} chatId={decodedChatId} />
+      </div>
     </div>
   );
 }

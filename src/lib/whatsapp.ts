@@ -92,7 +92,7 @@ const ACK_STATUS = {
 
 // Helper to detect message type and extract metadata
 function detectMessageType(message: proto.IMessage | null | undefined): {
-  type: 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'document';
+  type: 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'document' | 'location';
   metadata: Partial<MediaMetadata>;
   messageContent: proto.IMessage[keyof proto.IMessage] | null;
 } {
@@ -160,6 +160,19 @@ function detectMessageType(message: proto.IMessage | null | undefined): {
         fileName: message.documentMessage.fileName || 'document',
       },
       messageContent: message.documentMessage,
+    };
+  }
+
+  if (message.locationMessage) {
+    return {
+      type: 'location',
+      metadata: {
+        latitude: message.locationMessage.degreesLatitude ?? undefined,
+        longitude: message.locationMessage.degreesLongitude ?? undefined,
+        locationName: message.locationMessage.name ?? undefined,
+        locationAddress: message.locationMessage.address ?? undefined,
+      },
+      messageContent: message.locationMessage,
     };
   }
 
@@ -652,18 +665,23 @@ export async function connectToWhatsApp(whatsappId: string) {
         let mediaMetadata: Partial<MediaMetadata> | null = null;
         let fileName: string | null = null;
         
-        // Download and save media if present
-        if (messageType !== 'text' && messageContent) {
+        // Handle location messages (no media to download, just metadata)
+        if (messageType === 'location') {
+          mediaMetadata = metadata;
+          console.log(`[Location] Received location: ${metadata.latitude}, ${metadata.longitude}`);
+        }
+        // Download and save media if present (for image, video, audio, sticker, document)
+        else if (messageType !== 'text' && messageContent) {
           try {
             console.log(`[Media] Downloading ${messageType} for message ${msg.key.id}`);
-            
+
             const buffer = await downloadMediaFromMessage(messageContent, messageType);
-            
+
             if (buffer) {
               // Use original filename from metadata, or generate one
               const sanitizedFilename = metadata.fileName || `${messageType}_${msg.key.id}`;
               fileName = metadata.fileName || null; // Store original filename separately
-              
+
               const saveResult = await downloadAndSaveMedia(
                 buffer,
                 sanitizedFilename,
@@ -671,10 +689,10 @@ export async function connectToWhatsApp(whatsappId: string) {
                 msg.key.id || crypto.randomUUID(),
                 metadata
               );
-              
+
               mediaUrl = saveResult.url;
               mediaMetadata = saveResult.metadata;
-              
+
               console.log(`[Media] Saved ${messageType} to ${mediaUrl}`);
             }
           } catch (mediaError) {

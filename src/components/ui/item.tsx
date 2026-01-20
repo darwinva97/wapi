@@ -56,12 +56,26 @@ function Item({
   variant = "default",
   size = "default",
   asChild = false,
+  ref,
   ...props
 }: React.ComponentProps<"div"> &
   VariantProps<typeof itemVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "div"
+  if (asChild) {
+    return (
+      <Slot
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ref={ref as any}
+        data-slot="item"
+        data-variant={variant}
+        data-size={size}
+        className={cn(itemVariants({ variant, size, className }))}
+        {...props}
+      />
+    )
+  }
   return (
-    <Comp
+    <div
+      ref={ref}
       data-slot="item"
       data-variant={variant}
       data-size={size}

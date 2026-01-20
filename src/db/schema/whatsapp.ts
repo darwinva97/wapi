@@ -72,6 +72,16 @@ export const messageTable = sqliteTable("message", {
   mediaMetadata: text("media_metadata", { mode: 'json' }), // { mimetype, size, duration, width, height, fileName, sha256 }
   ackStatus: integer("ack_status", { mode: 'number' }).notNull().default(0), // 0=pending, 1=sent, 2=delivered, 3=read
   fileName: text("file_name"), // Original filename for documents
+  // Media retention fields
+  mediaRetentionUntil: integer("media_retention_until", { mode: "timestamp_ms" }), // Retain media until this date (null = use global policy)
+  mediaRetentionSetBy: text("media_retention_set_by")
+    .references(() => userTable.id, { onDelete: "set null" }), // User who configured the retention
+  // Message origin tracking fields
+  sentFromPlatform: integer("sent_from_platform", { mode: 'boolean' }).default(false), // Was sent from WAPI platform
+  sentByUserId: text("sent_by_user_id")
+    .references(() => userTable.id, { onDelete: "set null" }), // User who sent from platform
+  sentByConnectionId: text("sent_by_connection_id")
+    .references(() => connectionTable.id, { onDelete: "set null" }), // Connection that sent via API
 });
 
 export const reactionTable = sqliteTable("reaction", {

@@ -41,15 +41,27 @@ function Button({
   variant,
   size,
   asChild = false,
+  ref,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }) {
-  const Comp = asChild ? Slot : "button"
+  if (asChild) {
+    return (
+      <Slot
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ref={ref as any}
+        data-slot="button"
+        className={cn(buttonVariants({ variant, size, className }))}
+        {...props}
+      />
+    )
+  }
 
   return (
-    <Comp
+    <button
+      ref={ref}
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}

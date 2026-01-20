@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
 
 interface Message {
   id: string;
@@ -107,8 +106,8 @@ export function ChatMessages({ initialMessages, chatId, senderNames = {}, isGrou
   }, [chatId]);
 
   return (
-    <ScrollArea className="flex-1 min-h-0 overflow-auto p-4" ref={scrollRef}>
-      <div className="flex flex-col gap-4">
+    <ScrollArea className="flex-1 min-h-0 overflow-auto" ref={scrollRef}>
+      <div className="flex flex-col gap-4 p-4">
         {messages.length === 0 ? (
           <div className="text-center text-muted-foreground py-10">
             No hay mensajes aún.
@@ -132,12 +131,12 @@ export function ChatMessages({ initialMessages, chatId, senderNames = {}, isGrou
               )}
               {/* Media Preview */}
               {msg.messageType === 'image' && msg.mediaUrl && (
-                <Image 
-                  src={msg.mediaUrl} 
-                  alt={msg.fileName ? `Imagen: ${msg.fileName}` : 'Imagen de WhatsApp'} 
-                  className="rounded max-w-full h-auto max-h-64 object-contain"
-                  width={400}
-                  height={400}
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={msg.mediaUrl}
+                  alt={msg.fileName ? `Imagen: ${msg.fileName}` : 'Imagen de WhatsApp'}
+                  className="rounded max-w-full h-auto max-h-64 object-contain cursor-pointer"
+                  onClick={() => window.open(msg.mediaUrl!, '_blank')}
                 />
               )}
               {msg.messageType === 'video' && msg.mediaUrl && (
@@ -157,17 +156,16 @@ export function ChatMessages({ initialMessages, chatId, senderNames = {}, isGrou
                 />
               )}
               {msg.messageType === 'sticker' && msg.mediaUrl && (
-                <Image
-                  src={msg.mediaUrl} 
-                  alt="Sticker de WhatsApp" 
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={msg.mediaUrl}
+                  alt="Sticker de WhatsApp"
                   className="rounded max-w-32 h-auto"
-                  width={128}
-                  height={128}
                 />
               )}
               {msg.messageType === 'document' && msg.mediaUrl && (
-                <a 
-                  href={msg.mediaUrl} 
+                <a
+                  href={msg.mediaUrl}
                   download={msg.fileName || 'document'}
                   className="flex items-center gap-2 text-blue-500 hover:underline"
                 >
@@ -177,9 +175,38 @@ export function ChatMessages({ initialMessages, chatId, senderNames = {}, isGrou
                   <span>{msg.fileName || 'Descargar Documento'}</span>
                 </a>
               )}
-              
+              {msg.messageType === 'location' && msg.mediaMetadata && msg.mediaMetadata.latitude != null && msg.mediaMetadata.longitude != null && (() => {
+                const lat = msg.mediaMetadata.latitude as number;
+                const lng = msg.mediaMetadata.longitude as number;
+                const name = msg.mediaMetadata.locationName as string | undefined;
+                const address = msg.mediaMetadata.locationAddress as string | undefined;
+                const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+                return (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-start gap-3 p-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                  >
+                    {/* Map Icon */}
+                    <div className="flex-shrink-0 w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    {/* Location Info */}
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="font-medium text-sm">{name || 'Ubicación'}</span>
+                      {address && <span className="text-xs opacity-70 truncate">{address}</span>}
+                      <span className="text-xs text-blue-500">{lat.toFixed(6)}, {lng.toFixed(6)}</span>
+                    </div>
+                  </a>
+                );
+              })()}
+
               {/* Text Body */}
-              {msg.body || (msg.messageType !== 'text' && !msg.mediaUrl && <span className="italic opacity-50">Media/Mensaje del sistema</span>)}
+              {msg.body || (msg.messageType !== 'text' && msg.messageType !== 'location' && !msg.mediaUrl && <span className="italic opacity-50">Media/Mensaje del sistema</span>)}
               
               {/* Timestamp and Delivery Status */}
               <div className="flex items-center gap-1 text-[10px] opacity-70 self-end">

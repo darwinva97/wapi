@@ -80,6 +80,11 @@ export interface MediaMetadata {
   height?: number;
   fileName?: string;
   sha256?: string;
+  // Location fields
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
+  locationAddress?: string;
 }
 
 export interface SaveMediaResult {

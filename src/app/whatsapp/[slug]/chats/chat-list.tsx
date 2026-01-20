@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
+import { Search } from "lucide-react";
 
 interface Chat {
   id: string;
@@ -17,6 +19,8 @@ interface Chat {
   pushName?: string;
   lastMessage?: string | null;
   lastMessageAt?: number | null;
+  pn?: string | null;
+  lid?: string | null;
 }
 
 interface ChatListProps {
@@ -91,11 +95,51 @@ function MarqueeText({ text, className }: { text: string; className?: string }) 
 
 export function ChatList({ chats, slug }: ChatListProps) {
   const pathname = usePathname();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredChats = useMemo(() => {
+    if (!searchQuery.trim()) return chats;
+
+    const query = searchQuery.toLowerCase().trim();
+    return chats.filter((chat) => {
+      const name = (chat.name || '').toLowerCase();
+      const pushName = (chat.pushName || '').toLowerCase();
+      const identifier = (chat.identifier || '').toLowerCase();
+      const pn = (chat.pn || '').toLowerCase();
+      const lid = (chat.lid || '').toLowerCase();
+
+      return (
+        name.includes(query) ||
+        pushName.includes(query) ||
+        identifier.includes(query) ||
+        pn.includes(query) ||
+        lid.includes(query)
+      );
+    });
+  }, [chats, searchQuery]);
 
   return (
-    <ScrollArea className="flex-1 min-h-0 overflow-auto max-w-full">
-      <div className="flex flex-col gap-1 p-2">
-        {chats.map((chat) => {
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Sticky Search Header */}
+      <div className="p-2 border-b sticky top-0 bg-background z-10">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar contacto, número..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1 min-h-0 overflow-auto max-w-full">
+        <div className="flex flex-col gap-1 p-2">
+          {filteredChats.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8 text-sm">
+              No se encontraron conversaciones
+            </div>
+          ) : filteredChats.map((chat) => {
           const chatPath = `/whatsapp/${slug}/chats/${encodeURIComponent(chat.identifier)}`;
           const isActive = pathname === chatPath || pathname === decodeURIComponent(chatPath);
           
@@ -130,7 +174,8 @@ export function ChatList({ chats, slug }: ChatListProps) {
             </Link>
           );
         })}
-      </div>
-    </ScrollArea>
+        </div>
+      </ScrollArea>
+    </div>
   );
 }

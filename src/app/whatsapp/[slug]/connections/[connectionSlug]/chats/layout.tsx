@@ -38,12 +38,12 @@ async function ChatsLayout({
   ].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden border rounded-lg bg-background">
-      <div className="w-80 border-r flex flex-col">
-        <div className="p-4 border-b">
+    <div className="flex h-full max-h-full min-h-0 overflow-hidden border rounded-lg bg-background">
+      <div className="w-80 border-r flex flex-col h-full max-h-full min-h-0 overflow-hidden">
+        <div className="p-4 border-b shrink-0 bg-background sticky top-0 z-20">
           <h2 className="font-semibold">Chats</h2>
         </div>
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0 overflow-auto">
           <div className="flex flex-col gap-1 p-2">
             {allChats.map((chat) => (
               <Link
@@ -70,7 +70,7 @@ async function ChatsLayout({
           </div>
         </ScrollArea>
       </div>
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col h-full max-h-full min-h-0 overflow-hidden">
         {children}
       </div>
     </div>

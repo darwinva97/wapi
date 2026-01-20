@@ -40,14 +40,28 @@ function ButtonGroup({
 function ButtonGroupText({
   className,
   asChild = false,
+  ref,
   ...props
 }: React.ComponentProps<"div"> & {
   asChild?: boolean
 }) {
-  const Comp = asChild ? Slot : "div"
+  if (asChild) {
+    return (
+      <Slot
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ref={ref as any}
+        className={cn(
+          "bg-muted flex items-center gap-2 rounded-md border px-4 text-sm font-medium shadow-xs [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
+          className
+        )}
+        {...props}
+      />
+    )
+  }
 
   return (
-    <Comp
+    <div
+      ref={ref}
       className={cn(
         "bg-muted flex items-center gap-2 rounded-md border px-4 text-sm font-medium shadow-xs [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
         className

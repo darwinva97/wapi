@@ -29,13 +29,25 @@ function Badge({
   className,
   variant,
   asChild = false,
+  ref,
   ...props
 }: React.ComponentProps<"span"> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "span"
+  if (asChild) {
+    return (
+      <Slot
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ref={ref as any}
+        data-slot="badge"
+        className={cn(badgeVariants({ variant }), className)}
+        {...props}
+      />
+    )
+  }
 
   return (
-    <Comp
+    <span
+      ref={ref}
       data-slot="badge"
       className={cn(badgeVariants({ variant }), className)}
       {...props}

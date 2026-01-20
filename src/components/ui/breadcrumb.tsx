@@ -34,14 +34,26 @@ function BreadcrumbItem({ className, ...props }: React.ComponentProps<"li">) {
 function BreadcrumbLink({
   asChild,
   className,
+  ref,
   ...props
 }: React.ComponentProps<"a"> & {
   asChild?: boolean
 }) {
-  const Comp = asChild ? Slot : "a"
+  if (asChild) {
+    return (
+      <Slot
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ref={ref as any}
+        data-slot="breadcrumb-link"
+        className={cn("hover:text-foreground transition-colors", className)}
+        {...props}
+      />
+    )
+  }
 
   return (
-    <Comp
+    <a
+      ref={ref}
       data-slot="breadcrumb-link"
       className={cn("hover:text-foreground transition-colors", className)}
       {...props}
