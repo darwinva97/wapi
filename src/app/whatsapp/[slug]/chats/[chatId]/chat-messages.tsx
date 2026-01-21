@@ -97,20 +97,28 @@ export function ChatMessages({ initialMessages, chatId, slug, senderNames = {}, 
 
   // Sync state with initialMessages when they change
   useEffect(() => {
-    // Merge: keep SSE messages that aren't in initialMessages yet, add new ones from initialMessages
-    const allIds = new Set<string>();
-    const merged = [...messages, ...initialMessages].filter(m => {
-      if (allIds.has(m.id)) return false;
-      allIds.add(m.id);
-      return true;
-    });
-    
-    const sorted = merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    
-    // Only update if there are actually new messages
-    if (sorted.length !== messages.length) {
-      setMessages(sorted);
+    // Merge: prefer initialMessages data for existing messages (has reactions),
+    // but keep SSE messages that aren't in initialMessages yet
+    const merged: Message[] = [];
+    const seenIds = new Set<string>();
+
+    // First, add all initialMessages (they have the latest DB data including reactions)
+    for (const msg of initialMessages) {
+      merged.push(msg);
+      seenIds.add(msg.id);
     }
+
+    // Then add any SSE messages that aren't in initialMessages yet
+    for (const msg of messages) {
+      if (!seenIds.has(msg.id)) {
+        merged.push(msg);
+        seenIds.add(msg.id);
+      }
+    }
+
+    const sorted = merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    setMessages(sorted);
   }, [initialMessages]); // Only depend on initialMessages, not messages
 
   useEffect(() => {
