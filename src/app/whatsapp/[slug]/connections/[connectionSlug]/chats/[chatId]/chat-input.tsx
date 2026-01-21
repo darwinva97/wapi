@@ -25,9 +25,12 @@ export function ChatInput({ slug, connectionSlug, chatId }: ChatInputProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = () => {
     if (!message.trim() && !selectedFile) return;
+
+    const hadFocus = document.activeElement === inputRef.current;
 
     startTransition(async () => {
       try {
@@ -43,6 +46,10 @@ export function ChatInput({ slug, connectionSlug, chatId }: ChatInputProps) {
           await sendMessageAction(slug, connectionSlug, chatId, message);
         }
         setMessage("");
+
+        if (hadFocus && (document.activeElement === document.body || document.activeElement === inputRef.current)) {
+          inputRef.current?.focus();
+        }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to send message");
       }
@@ -105,6 +112,7 @@ export function ChatInput({ slug, connectionSlug, chatId }: ChatInputProps) {
           <Paperclip className="h-4 w-4" />
         </Button>
         <Input
+          ref={inputRef}
           placeholder={selectedFile ? "Add a caption (optional)..." : "Type a message..."}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
