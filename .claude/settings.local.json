@@ -14,7 +14,12 @@
       "Bash(bun add:*)",
       "Bash(npm cache clean:*)",
       "Bash(grep:*)",
-      "Bash(bun run build:*)"
+      "Bash(bun run build:*)",
+      "Bash(xargs cat:*)",
+      "Bash(find:*)",
+      "Bash(corepack enable:*)",
+      "Bash(npx pnpm install)",
+      "Bash(psql:*)"
     ]
   }
 }

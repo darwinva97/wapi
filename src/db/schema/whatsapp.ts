@@ -1,7 +1,7 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { pgTable, text, boolean, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
 import { userTable } from "./user";
 
-export const whatsappTable = sqliteTable("whatsapp", {
+export const whatsappTable = pgTable("whatsapp", {
   id: text("id").primaryKey(),
   userId: text("user_id")
     .notNull()
@@ -10,11 +10,11 @@ export const whatsappTable = sqliteTable("whatsapp", {
   description: text("description"),
   slug: text("slug").notNull().unique(),
   phoneNumber: text("phone_number").notNull().unique(),
-  connected: integer("connected", { mode: 'boolean' }).notNull(),
-  enabled: integer("enabled", { mode: 'boolean' }).notNull(),
+  connected: boolean("connected").notNull(),
+  enabled: boolean("enabled").notNull(),
 });
 
-export const contactTable = sqliteTable("contact", {
+export const contactTable = pgTable("contact", {
   id: text("id").primaryKey(),
   whatsappId: text("whatsapp_id")
     .notNull()
@@ -26,7 +26,7 @@ export const contactTable = sqliteTable("contact", {
   description: text("description"),
 });
 
-export const groupTable = sqliteTable("group", {
+export const groupTable = pgTable("group", {
   id: text("id").primaryKey(),
   whatsappId: text("whatsapp_id")
     .notNull()
@@ -37,7 +37,7 @@ export const groupTable = sqliteTable("group", {
   description: text("description"),
 });
 
-export const connectionTable = sqliteTable("connection", {
+export const connectionTable = pgTable("connection", {
   id: text("id").primaryKey(),
   whatsappId: text("whatsapp_id")
     .notNull()
@@ -46,15 +46,15 @@ export const connectionTable = sqliteTable("connection", {
   description: text("description"),
   slug: text("slug").notNull().unique(),
   //
-  receiverEnabled: integer("receiver_enabled", { mode: 'boolean' }).notNull(),
-  receiverRequest: text("receiver_request", { mode: 'json' }),
-  receiverFilter: text("receiver_filter", { mode: 'json' }),
+  receiverEnabled: boolean("receiver_enabled").notNull(),
+  receiverRequest: jsonb("receiver_request"),
+  receiverFilter: jsonb("receiver_filter"),
   //
-  senderEnabled: integer("sender_enabled", { mode: 'boolean' }).notNull(),
+  senderEnabled: boolean("sender_enabled").notNull(),
   senderToken: text("sender_token"),
 });
 
-export const messageTable = sqliteTable("message", {
+export const messageTable = pgTable("message", {
   id: text("id").primaryKey(),
   whatsappId: text("whatsapp_id")
     .notNull()
@@ -62,29 +62,29 @@ export const messageTable = sqliteTable("message", {
   chatId: text("chat_id").notNull(),
   chatType: text("chat_type").notNull(), // 'group' | 'personal'
   senderId: text("sender_id").notNull(),
-  content: text("content", { mode: 'json' }),
+  content: jsonb("content"),
   body: text("body"),
-  timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
-  fromMe: integer("from_me", { mode: 'boolean' }).notNull(),
+  timestamp: timestamp("timestamp", { mode: "date", withTimezone: true }).notNull(),
+  fromMe: boolean("from_me").notNull(),
   // Media and tracking fields
   messageType: text("message_type").notNull().default('text'), // 'text' | 'image' | 'video' | 'audio' | 'sticker' | 'document'
   mediaUrl: text("media_url"), // Public path to media file
-  mediaMetadata: text("media_metadata", { mode: 'json' }), // { mimetype, size, duration, width, height, fileName, sha256 }
-  ackStatus: integer("ack_status", { mode: 'number' }).notNull().default(0), // 0=pending, 1=sent, 2=delivered, 3=read
+  mediaMetadata: jsonb("media_metadata"), // { mimetype, size, duration, width, height, fileName, sha256 }
+  ackStatus: integer("ack_status").notNull().default(0), // 0=pending, 1=sent, 2=delivered, 3=read
   fileName: text("file_name"), // Original filename for documents
   // Media retention fields
-  mediaRetentionUntil: integer("media_retention_until", { mode: "timestamp_ms" }), // Retain media until this date (null = use global policy)
+  mediaRetentionUntil: timestamp("media_retention_until", { mode: "date", withTimezone: true }), // Retain media until this date (null = use global policy)
   mediaRetentionSetBy: text("media_retention_set_by")
     .references(() => userTable.id, { onDelete: "set null" }), // User who configured the retention
   // Message origin tracking fields
-  sentFromPlatform: integer("sent_from_platform", { mode: 'boolean' }).default(false), // Was sent from WAPI platform
+  sentFromPlatform: boolean("sent_from_platform").default(false), // Was sent from WAPI platform
   sentByUserId: text("sent_by_user_id")
     .references(() => userTable.id, { onDelete: "set null" }), // User who sent from platform
   sentByConnectionId: text("sent_by_connection_id")
     .references(() => connectionTable.id, { onDelete: "set null" }), // Connection that sent via API
 });
 
-export const reactionTable = sqliteTable("reaction", {
+export const reactionTable = pgTable("reaction", {
   id: text("id").primaryKey(),
   whatsappId: text("whatsapp_id")
     .notNull()
@@ -95,11 +95,11 @@ export const reactionTable = sqliteTable("reaction", {
   chatId: text("chat_id").notNull(),
   senderId: text("sender_id").notNull(), // Who reacted
   emoji: text("emoji").notNull(), // The reaction emoji
-  timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
-  fromMe: integer("from_me", { mode: 'boolean' }).notNull(),
+  timestamp: timestamp("timestamp", { mode: "date", withTimezone: true }).notNull(),
+  fromMe: boolean("from_me").notNull(),
 });
 
-export const pollTable = sqliteTable("poll", {
+export const pollTable = pgTable("poll", {
   id: text("id").primaryKey(), // Poll message ID
   whatsappId: text("whatsapp_id")
     .notNull()
@@ -109,13 +109,13 @@ export const pollTable = sqliteTable("poll", {
     .references(() => messageTable.id, { onDelete: "cascade" }),
   chatId: text("chat_id").notNull(),
   question: text("question").notNull(),
-  options: text("options", { mode: 'json' }).notNull(), // Array of poll options
-  allowMultipleAnswers: integer("allow_multiple_answers", { mode: 'boolean' }).notNull().default(false),
+  options: jsonb("options").notNull(), // Array of poll options
+  allowMultipleAnswers: boolean("allow_multiple_answers").notNull().default(false),
   createdBy: text("created_by").notNull(),
-  timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
+  timestamp: timestamp("timestamp", { mode: "date", withTimezone: true }).notNull(),
 });
 
-export const pollVoteTable = sqliteTable("poll_vote", {
+export const pollVoteTable = pgTable("poll_vote", {
   id: text("id").primaryKey(),
   whatsappId: text("whatsapp_id")
     .notNull()
@@ -124,6 +124,6 @@ export const pollVoteTable = sqliteTable("poll_vote", {
     .notNull()
     .references(() => pollTable.id, { onDelete: "cascade" }),
   voterId: text("voter_id").notNull(), // Who voted
-  selectedOptions: text("selected_options", { mode: 'json' }).notNull(), // Array of selected option indices
-  timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
+  selectedOptions: jsonb("selected_options").notNull(), // Array of selected option indices
+  timestamp: timestamp("timestamp", { mode: "date", withTimezone: true }).notNull(),
 });

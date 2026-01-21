@@ -1,5 +1,5 @@
-import { relations, sql } from "drizzle-orm";
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { relations } from "drizzle-orm";
+import { pgTable, text, boolean, timestamp, integer, index, jsonb } from "drizzle-orm/pg-core";
 import { userTable } from "./user";
 import { whatsappTable } from "./whatsapp";
 
@@ -10,27 +10,25 @@ export type WhatsappMemberRole = "owner" | "manager" | "agent";
 export type StorageType = "local" | "s3";
 
 // Platform configuration (singleton)
-export const platformConfigTable = sqliteTable("platform_config", {
+export const platformConfigTable = pgTable("platform_config", {
   id: text("id").primaryKey().default("default"),
-  allowRegistration: integer("allow_registration", { mode: "boolean" })
+  allowRegistration: boolean("allow_registration")
     .notNull()
     .default(false),
-  allowUserCreateWhatsapp: integer("allow_user_create_whatsapp", {
-    mode: "boolean",
-  })
+  allowUserCreateWhatsapp: boolean("allow_user_create_whatsapp")
     .notNull()
     .default(true),
   defaultMaxWhatsappInstances: integer("default_max_whatsapp_instances")
     .notNull()
     .default(0), // 0 = unlimited
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
 });
 
 // User-specific configuration overrides
-export const userConfigTable = sqliteTable(
+export const userConfigTable = pgTable(
   "user_config",
   {
     id: text("id").primaryKey(),
@@ -38,13 +36,13 @@ export const userConfigTable = sqliteTable(
       .notNull()
       .unique()
       .references(() => userTable.id, { onDelete: "cascade" }),
-    canCreateWhatsapp: integer("can_create_whatsapp", { mode: "boolean" }), // null = use global
+    canCreateWhatsapp: boolean("can_create_whatsapp"), // null = use global
     maxWhatsappInstances: integer("max_whatsapp_instances"), // null = use global
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
       .notNull(),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
@@ -52,7 +50,7 @@ export const userConfigTable = sqliteTable(
 );
 
 // WhatsApp instance members (roles: owner, manager, agent)
-export const whatsappMemberTable = sqliteTable(
+export const whatsappMemberTable = pgTable(
   "whatsapp_member",
   {
     id: text("id").primaryKey(),
@@ -63,8 +61,8 @@ export const whatsappMemberTable = sqliteTable(
       .notNull()
       .references(() => userTable.id, { onDelete: "cascade" }),
     role: text("role").$type<WhatsappMemberRole>().notNull().default("agent"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
       .notNull(),
     createdBy: text("created_by").references(() => userTable.id, {
       onDelete: "set null",
@@ -81,37 +79,37 @@ export const whatsappMemberTable = sqliteTable(
 );
 
 // WhatsApp cleanup configuration
-export const whatsappCleanupConfigTable = sqliteTable(
+export const whatsappCleanupConfigTable = pgTable(
   "whatsapp_cleanup_config",
   {
     whatsappId: text("whatsapp_id")
       .primaryKey()
       .references(() => whatsappTable.id, { onDelete: "cascade" }),
-    cleanupEnabled: integer("cleanup_enabled", { mode: "boolean" })
+    cleanupEnabled: boolean("cleanup_enabled")
       .notNull()
       .default(false),
     cleanupDays: integer("cleanup_days").notNull().default(30),
-    excludeChats: text("exclude_chats", { mode: "json" })
+    excludeChats: jsonb("exclude_chats")
       .$type<string[]>()
       .default([]),
-    includeOnlyChats: text("include_only_chats", { mode: "json" })
+    includeOnlyChats: jsonb("include_only_chats")
       .$type<string[]>()
       .default([]),
-    forceCleanup: integer("force_cleanup", { mode: "boolean" })
+    forceCleanup: boolean("force_cleanup")
       .notNull()
       .default(false),
     maxAgentRetentionDays: integer("max_agent_retention_days")
       .notNull()
       .default(90),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   }
 );
 
 // Chat-specific configuration
-export const chatConfigTable = sqliteTable(
+export const chatConfigTable = pgTable(
   "chat_config",
   {
     id: text("id").primaryKey(),
@@ -120,17 +118,17 @@ export const chatConfigTable = sqliteTable(
       .references(() => whatsappTable.id, { onDelete: "cascade" }),
     chatId: text("chat_id").notNull(),
     customName: text("custom_name"),
-    cleanupExcluded: integer("cleanup_excluded", { mode: "boolean" })
+    cleanupExcluded: boolean("cleanup_excluded")
       .notNull()
       .default(false),
-    cleanupIncluded: integer("cleanup_included", { mode: "boolean" })
+    cleanupIncluded: boolean("cleanup_included")
       .notNull()
       .default(false),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
       .notNull(),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
@@ -141,7 +139,7 @@ export const chatConfigTable = sqliteTable(
 );
 
 // Chat notes
-export const chatNoteTable = sqliteTable(
+export const chatNoteTable = pgTable(
   "chat_note",
   {
     id: text("id").primaryKey(),
@@ -153,11 +151,11 @@ export const chatNoteTable = sqliteTable(
     createdBy: text("created_by")
       .notNull()
       .references(() => userTable.id, { onDelete: "cascade" }),
-    createdAt: integer("created_at", { mode: "timestamp_ms" })
-      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
       .notNull(),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
@@ -168,7 +166,7 @@ export const chatNoteTable = sqliteTable(
 );
 
 // Storage configuration (singleton)
-export const storageConfigTable = sqliteTable("storage_config", {
+export const storageConfigTable = pgTable("storage_config", {
   id: text("id").primaryKey().default("default"),
   storageType: text("storage_type").$type<StorageType>().notNull().default("local"),
   s3Endpoint: text("s3_endpoint"),
@@ -177,8 +175,8 @@ export const storageConfigTable = sqliteTable("storage_config", {
   s3AccessKey: text("s3_access_key"), // Should be encrypted
   s3SecretKey: text("s3_secret_key"), // Should be encrypted
   s3PublicUrl: text("s3_public_url"),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
 });

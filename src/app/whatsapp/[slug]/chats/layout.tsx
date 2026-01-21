@@ -47,19 +47,29 @@ async function ChatsLayout({
       .map(c => [c.chatId, c.customName])
   );
 
-  // Get last message for each chat
+  // Get last message for each chat using DISTINCT ON (PostgreSQL feature)
   const lastMessages = await db
     .select({
       chatId: messageTable.chatId,
       lastMessageBody: messageTable.body,
-      lastMessageTimestamp: sql<number>`MAX(${messageTable.timestamp})`.as('last_timestamp'),
+      lastMessageTimestamp: messageTable.timestamp,
     })
     .from(messageTable)
     .where(eq(messageTable.whatsappId, whatsapp.id))
-    .groupBy(messageTable.chatId);
+    .orderBy(messageTable.chatId, sql`${messageTable.timestamp} DESC`)
+    .then(rows => {
+      // Group by chatId and take the first (most recent) message for each
+      const byChat = new Map<string, typeof rows[0]>();
+      for (const row of rows) {
+        if (!byChat.has(row.chatId)) {
+          byChat.set(row.chatId, row);
+        }
+      }
+      return Array.from(byChat.values());
+    });
 
   const lastMessageMap = new Map(
-    lastMessages.map(m => [m.chatId, { body: m.lastMessageBody, timestamp: m.lastMessageTimestamp }])
+    lastMessages.map(m => [m.chatId, { body: m.lastMessageBody, timestamp: m.lastMessageTimestamp?.getTime() ?? null }])
   );
 
   const allChats = [

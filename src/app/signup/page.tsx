@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { signIn } from "@/lib/auth-client";
+import { signUp } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -18,30 +18,70 @@ import { Spinner } from "@/components/ui/spinner";
 import { AlertCircle, MessageCircle } from "lucide-react";
 import { checkRegistrationAllowed } from "./actions";
 
-export default function LoginPage() {
+export default function SignupPage() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [registrationAllowed, setRegistrationAllowed] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [allowed, setAllowed] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    checkRegistrationAllowed().then(setRegistrationAllowed);
+    let mounted = true;
+    checkRegistrationAllowed().then((result) => {
+      if (!mounted) return;
+      console.log("[signup] checkRegistrationAllowed result:", result);
+      setAllowed(result);
+      setChecking(false);
+    });
+    return () => { mounted = false; };
   }, []);
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden");
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("La contraseña debe tener al menos 8 caracteres");
+      setLoading(false);
+      return;
+    }
+
     try {
-      await signIn.email({ email, password });
-      router.replace("/");
+      const result = await signUp.email({ email, password, name });
+      if (result.error) {
+        setError(result.error.message || "Error al crear la cuenta");
+      } else {
+        router.replace("/");
+      }
     } catch (err: unknown) {
-      setError((err as Error)?.message || "Error al iniciar sesión");
+      setError((err as Error)?.message || "Error al crear la cuenta");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <Spinner className="h-8 w-8" />
+      </main>
+    );
+  }
+
+  if (!allowed) {
+    router.replace("/login");
+    return null;
   }
 
   return (
@@ -58,13 +98,30 @@ export default function LoginPage() {
 
         <Card className="shadow-lg border-border/50">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl font-semibold">Bienvenido de nuevo</CardTitle>
+            <CardTitle className="text-xl font-semibold">Crear cuenta</CardTitle>
             <CardDescription>
-              Ingresa tus credenciales para acceder a tu cuenta
+              Ingresa tus datos para registrarte
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="space-y-4" onSubmit={handleLogin}>
+            <form className="space-y-4" onSubmit={handleSignup}>
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-sm font-medium">
+                  Nombre
+                </Label>
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Tu nombre"
+                  disabled={loading}
+                  className="h-10"
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
                   Email
@@ -90,10 +147,27 @@ export default function LoginPage() {
                   id="password"
                   name="password"
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  disabled={loading}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-sm font-medium">
+                  Confirmar contraseña
+                </Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
                   disabled={loading}
                   className="h-10"
@@ -115,27 +189,25 @@ export default function LoginPage() {
                 {loading ? (
                   <>
                     <Spinner className="mr-2" />
-                    Iniciando sesión...
+                    Creando cuenta...
                   </>
                 ) : (
-                  "Iniciar sesión"
+                  "Crear cuenta"
                 )}
               </Button>
             </form>
 
-            {registrationAllowed && (
-              <div className="mt-4 text-center text-sm">
-                <span className="text-muted-foreground">¿No tienes cuenta? </span>
-                <Link href="/signup" className="text-primary hover:underline">
-                  Registrarse
-                </Link>
-              </div>
-            )}
+            <div className="mt-4 text-center text-sm">
+              <span className="text-muted-foreground">¿Ya tienes cuenta? </span>
+              <Link href="/login" className="text-primary hover:underline">
+                Iniciar sesión
+              </Link>
+            </div>
           </CardContent>
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
-          Al iniciar sesión, aceptas nuestros términos y condiciones
+          Al registrarte, aceptas nuestros términos y condiciones
         </p>
       </div>
     </main>

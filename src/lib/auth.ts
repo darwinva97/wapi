@@ -4,10 +4,11 @@ import { admin } from "better-auth/plugins";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { BETTER_AUTH_SECRET, BETTER_AUTH_URL } from "@/config";
+import { platformConfigTable } from "@/db/schema";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
-    provider: "sqlite",
+    provider: "pg",
     schema: {
       ...schema,
       user: schema.userTable,
@@ -25,6 +26,15 @@ export const auth = betterAuth({
   ],
   emailAndPassword: {
     enabled: true,
-    disableSignUp: true,
+    async signUpEnabled() {
+      // Check platform config to see if registration is allowed
+      try {
+        const config = await db.query.platformConfigTable.findFirst();
+        return config?.allowRegistration ?? false;
+      } catch {
+        // If table doesn't exist yet, default to disabled
+        return false;
+      }
+    },
   },
 });

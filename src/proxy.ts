@@ -21,6 +21,9 @@ export async function proxy(request: NextRequest) {
 
   if (!sessionCookie) {
     const { pathname } = request.nextUrl;
+    if (pathname === "/signup") {
+      return NextResponse.next();
+    }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);

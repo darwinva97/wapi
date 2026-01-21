@@ -122,7 +122,7 @@ async function cleanupWhatsappInstance(
   if (!config.forceCleanup) {
     // Exclude messages with retention set to future date
     conditions.push(
-      sql`(${messageTable.mediaRetentionUntil} IS NULL OR ${messageTable.mediaRetentionUntil} < ${Date.now()})`
+      sql`(${messageTable.mediaRetentionUntil} IS NULL OR ${messageTable.mediaRetentionUntil} < NOW())`
     );
   }
 
