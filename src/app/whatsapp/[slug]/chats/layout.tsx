@@ -82,18 +82,21 @@ async function ChatsLayout({
       lastMessageAt: lastMessageMap.get(g.gid)?.timestamp || null,
     })),
     ...contacts.map(c => {
-      // Prefer pn if it's a valid JID, otherwise use lid
       const pnValid = c.pn && c.pn.includes('@s.whatsapp.net');
       const lidValid = c.lid && c.lid.includes('@lid');
-      const identifier = pnValid ? c.pn : (lidValid ? c.lid : (c.pn || c.lid));
 
       // Try different JID formats for matching messages
       const jidVariants = [
-        c.pn,
         c.lid,
-        identifier,
+        c.pn,
         c.pn ? `${c.pn.split('@')[0]}@s.whatsapp.net` : null,
       ].filter(Boolean) as string[];
+
+      // Find which JID has messages (this is the chatId used in the database)
+      const jidWithMessages = jidVariants.find(jid => lastMessageMap.has(jid));
+
+      // Use the JID that has messages, otherwise prefer LID (as WhatsApp now uses LID by default)
+      const identifier = jidWithMessages || (lidValid ? c.lid : (pnValid ? c.pn : (c.lid || c.pn)));
 
       const lastMsg = jidVariants.reduce((found, jid) => found || lastMessageMap.get(jid), undefined as { body: string | null; timestamp: number } | undefined);
       // Check for custom name with different JID formats

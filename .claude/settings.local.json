@@ -19,7 +19,9 @@
       "Bash(find:*)",
       "Bash(corepack enable:*)",
       "Bash(npx pnpm install)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(lsof:*)",
+      "Bash(ss:*)"
     ]
   }
 }

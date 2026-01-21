@@ -1,9 +1,11 @@
 'use server';
 
+import { db } from "@/db";
+import { reactionTable } from "@/db/schema";
 import { getWhatsappBySlugWithRole } from "@/lib/auth-utils";
+import { getSocket } from "@/lib/whatsapp";
 import { revalidatePath } from "next/cache";
-
-const WHATSAPP_API_URL = process.env.WHATSAPP_API_URL || 'http://localhost:3001';
+import { and, eq } from "drizzle-orm";
 
 export async function sendReactionAction(
   slug: string,
@@ -13,22 +15,58 @@ export async function sendReactionAction(
 ) {
   const { wa } = await getWhatsappBySlugWithRole(slug, "agent");
 
-  // Send reaction via WhatsApp API
-  const response = await fetch(`${WHATSAPP_API_URL}/api/whatsapp/${wa.phoneNumber}/react`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+  const sock = getSocket(wa.id);
+
+  if (!sock) {
+    throw new Error("WhatsApp is not connected");
+  }
+
+  const senderId = sock.user?.id || "";
+
+  await sock.sendMessage(chatId, {
+    react: {
+      text: emoji,
+      key: {
+        remoteJid: chatId,
+        id: messageId,
+        fromMe: false,
+      },
     },
-    body: JSON.stringify({
-      chatId,
-      messageId,
-      emoji,
-    }),
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Error sending reaction: ${error}`);
+  // Save reaction to database
+  if (emoji === "") {
+    // Remove reaction
+    await db
+      .delete(reactionTable)
+      .where(
+        and(
+          eq(reactionTable.whatsappId, wa.id),
+          eq(reactionTable.messageId, messageId),
+          eq(reactionTable.senderId, senderId),
+        ),
+      );
+  } else {
+    // Add or update reaction
+    await db
+      .insert(reactionTable)
+      .values({
+        id: crypto.randomUUID(),
+        whatsappId: wa.id,
+        messageId: messageId,
+        chatId: chatId,
+        senderId: senderId,
+        emoji: emoji,
+        timestamp: new Date(),
+        fromMe: true,
+      })
+      .onConflictDoUpdate({
+        target: reactionTable.id,
+        set: {
+          emoji: emoji,
+          timestamp: new Date(),
+        },
+      });
   }
 
   revalidatePath(`/whatsapp/${slug}/chats/${encodeURIComponent(chatId)}`);
