@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { contactTable, groupTable, messageTable, reactionTable } from "@/db/schema";
-import { eq, and, asc, inArray } from "drizzle-orm";
+import { eq, and, asc, inArray, or } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -36,11 +36,37 @@ export default async function ChatPage({
 
   if (!whatsapp) return notFound();
 
-  // Fetch messages
+  // For personal chats, find the contact to get both lid and pn
+  // This handles the case where the URL uses lid but messages are stored with pn (or vice versa)
+  let chatIdVariants = [decodedChatId];
+
+  if (!decodedChatId.includes('@g.us')) {
+    // Try to find contact by lid or pn
+    const contact = await db.query.contactTable.findFirst({
+      where: and(
+        eq(contactTable.whatsappId, whatsapp.id),
+        or(
+          eq(contactTable.lid, decodedChatId),
+          eq(contactTable.pn, decodedChatId)
+        )
+      )
+    });
+
+    if (contact) {
+      // Add both lid and pn as possible chatIds
+      chatIdVariants = [
+        decodedChatId,
+        contact.lid,
+        contact.pn,
+      ].filter(Boolean) as string[];
+    }
+  }
+
+  // Fetch messages using all possible chatId variants
   const rawMessages = await db.query.messageTable.findMany({
     where: and(
       eq(messageTable.whatsappId, whatsapp.id),
-      eq(messageTable.chatId, decodedChatId)
+      or(...chatIdVariants.map(id => eq(messageTable.chatId, id)))
     ),
     orderBy: asc(messageTable.timestamp),
   });
