@@ -111,16 +111,19 @@ async function ChatsLayout({
       };
     })
   ].sort((a, b) => {
+    // Helper: check if name has at least one letter or number
+    const hasAlphanumeric = (name: string) => /[a-zA-Z0-9]/.test(name);
+
     // Sort by last message timestamp (most recent first), null values go to the end
     if (a.lastMessageAt === null && b.lastMessageAt === null) {
-      // Both have no messages - sort by name, but put short names (1 char like ".") at the end
+      // Both have no messages - sort by name, but put names without letters/numbers at the end
       const aName = a.name || '';
       const bName = b.name || '';
-      const aIsShort = aName.trim().length <= 1;
-      const bIsShort = bName.trim().length <= 1;
+      const aValid = hasAlphanumeric(aName);
+      const bValid = hasAlphanumeric(bName);
 
-      if (aIsShort && !bIsShort) return 1;
-      if (!aIsShort && bIsShort) return -1;
+      if (aValid && !bValid) return -1;
+      if (!aValid && bValid) return 1;
 
       return aName.localeCompare(bName);
     }
