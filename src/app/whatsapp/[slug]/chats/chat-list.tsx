@@ -145,7 +145,12 @@ export function ChatList({ chats, slug }: ChatListProps) {
           ) : filteredChats.map((chat) => {
           const chatPath = `/whatsapp/${slug}/chats/${encodeURIComponent(chat.identifier)}`;
           const isActive = pathname === chatPath || pathname === decodeURIComponent(chatPath);
-          const displayName = chat.customName || chat.name;
+
+          // Get display name with fallbacks: customName > name > phone number > identifier
+          const rawName = chat.customName || chat.name;
+          const isValidName = rawName && rawName.trim().length > 1 && rawName !== '.';
+          const phoneNumber = chat.pn?.split('@')[0] || chat.lid?.split('@')[0];
+          const displayName = isValidName ? rawName : (phoneNumber || chat.identifier || '?');
 
           return (
             <Link
@@ -157,7 +162,7 @@ export function ChatList({ chats, slug }: ChatListProps) {
               )}
             >
               <Avatar>
-                <AvatarFallback>{displayName?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                <AvatarFallback suppressHydrationWarning>{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden min-w-0 w-full">
                 <div className="flex items-center justify-between gap-2">

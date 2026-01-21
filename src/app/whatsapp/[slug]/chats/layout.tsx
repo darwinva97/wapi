@@ -113,7 +113,16 @@ async function ChatsLayout({
   ].sort((a, b) => {
     // Sort by last message timestamp (most recent first), null values go to the end
     if (a.lastMessageAt === null && b.lastMessageAt === null) {
-      return (a.name || '').localeCompare(b.name || '');
+      // Both have no messages - sort by name, but put short names (1 char like ".") at the end
+      const aName = a.name || '';
+      const bName = b.name || '';
+      const aIsShort = aName.trim().length <= 1;
+      const bIsShort = bName.trim().length <= 1;
+
+      if (aIsShort && !bIsShort) return 1;
+      if (!aIsShort && bIsShort) return -1;
+
+      return aName.localeCompare(bName);
     }
     if (a.lastMessageAt === null) return 1;
     if (b.lastMessageAt === null) return -1;

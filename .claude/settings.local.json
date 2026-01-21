@@ -21,7 +21,10 @@
       "Bash(npx pnpm install)",
       "Bash(psql:*)",
       "Bash(lsof:*)",
-      "Bash(ss:*)"
+      "Bash(ss:*)",
+      "Bash(curl:*)",
+      "Bash(pgrep:*)",
+      "Bash(npx tsx:*)"
     ]
   }
 }

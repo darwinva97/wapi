@@ -286,6 +286,102 @@ export async function connectToWhatsApp(whatsappId: string) {
       saveCreds();
     });
 
+    // Handle messaging-history.set event - triggered during initial sync and can contain contacts
+    sock.ev.on("messaging-history.set", async ({ contacts: historyContacts }) => {
+      if (!historyContacts || historyContacts.length === 0) return;
+
+      console.log(
+        `[Event] messaging-history.set triggered for ${whatsappId} - ${historyContacts.length} contacts`,
+      );
+
+      const user = sock.user;
+      const phoneNumber = user?.id?.split(":")[0] || user?.id?.split("@")[0];
+
+      for (const contact of historyContacts) {
+        const normalized = normalizeContactData(contact);
+
+        if (isOwnContact(normalized.lid, normalized.pn, phoneNumber || ""))
+          continue;
+
+        if (normalized.lid || normalized.pn) {
+          let existing;
+
+          if (normalized.lid) {
+            existing = await db.query.contactTable.findFirst({
+              where: and(
+                eq(contactTable.whatsappId, whatsappId),
+                eq(contactTable.lid, normalized.lid),
+              ),
+            });
+          } else if (normalized.pn) {
+            existing = await db.query.contactTable.findFirst({
+              where: and(
+                eq(contactTable.whatsappId, whatsappId),
+                eq(contactTable.pn, normalized.pn),
+              ),
+            });
+          }
+
+          if (!existing) {
+            const realPushName =
+              normalized.notifyName ||
+              normalized.verifiedName ||
+              null;
+            const displayName =
+              normalized.contactName ||
+              realPushName ||
+              normalized.pn?.split("@")[0] ||
+              normalized.lid?.split("@")[0] ||
+              "Unknown";
+            try {
+              await db.insert(contactTable).values({
+                id: crypto.randomUUID(),
+                whatsappId,
+                name: displayName,
+                pushName: realPushName || displayName,
+                lid: normalized.lid || "",
+                pn: normalized.pn || "",
+                description: "",
+              });
+              console.log(`[messaging-history.set] Inserted contact: ${displayName}`);
+            } catch (e) {
+              console.error("Error inserting contact from history:", e);
+            }
+          } else {
+            // Update existing contact with better information (same logic as contacts.upsert)
+            const updateData: Partial<{ name: string; pushName: string; lid: string; pn: string }> = {};
+
+            if (normalized.contactName) {
+              updateData.name = normalized.contactName;
+            }
+
+            if (normalized.notifyName || normalized.verifiedName) {
+              updateData.pushName = normalized.notifyName || normalized.verifiedName || existing.pushName;
+            }
+
+            if (normalized.lid && (!existing.lid || !existing.lid.includes("@lid"))) {
+              updateData.lid = normalized.lid;
+            }
+            if (normalized.pn && (!existing.pn || !existing.pn.includes("@s.whatsapp.net"))) {
+              updateData.pn = normalized.pn;
+            }
+
+            if (Object.keys(updateData).length > 0) {
+              try {
+                await db
+                  .update(contactTable)
+                  .set(updateData)
+                  .where(eq(contactTable.id, existing.id));
+                console.log(`[messaging-history.set] Updated contact ${existing.id}: ${JSON.stringify(updateData)}`);
+              } catch (e) {
+                console.error("Error updating contact from history:", e);
+              }
+            }
+          }
+        }
+      }
+    });
+
     sock.ev.on("contacts.upsert", async (contacts) => {
       console.log(
         `[Event] contacts.upsert triggered for ${whatsappId} - ${contacts.length} contacts`,
@@ -347,13 +443,34 @@ export async function connectToWhatsApp(whatsappId: string) {
               console.error("Error inserting contact:", e);
             }
           } else {
-            // Update
+            // Update existing contact with better information
+            const updateData: Partial<{ name: string; pushName: string; lid: string; pn: string }> = {};
+
+            // Always update name if we have contactName from the address book
             if (normalized.contactName) {
+              updateData.name = normalized.contactName;
+            }
+
+            // Update pushName if we have notifyName or verifiedName
+            if (normalized.notifyName || normalized.verifiedName) {
+              updateData.pushName = normalized.notifyName || normalized.verifiedName || existing.pushName;
+            }
+
+            // Fill in missing lid or pn if we have them now
+            if (normalized.lid && (!existing.lid || !existing.lid.includes("@lid"))) {
+              updateData.lid = normalized.lid;
+            }
+            if (normalized.pn && (!existing.pn || !existing.pn.includes("@s.whatsapp.net"))) {
+              updateData.pn = normalized.pn;
+            }
+
+            if (Object.keys(updateData).length > 0) {
               try {
                 await db
                   .update(contactTable)
-                  .set({ name: normalized.contactName })
+                  .set(updateData)
                   .where(eq(contactTable.id, existing.id));
+                console.log(`[contacts.upsert] Updated contact ${existing.id}: ${JSON.stringify(updateData)}`);
               } catch (e) {
                 console.error("Error updating contact:", e);
               }
@@ -683,6 +800,7 @@ export async function connectToWhatsApp(whatsappId: string) {
           const isGroupChat = isGroup(msg.key.remoteJid);
 
           // Check and create contact if sender doesn't exist and it's not own message
+          // This works for both direct messages and group messages (participant)
           if (
             !msg.key.fromMe &&
             senderId &&
@@ -693,11 +811,23 @@ export async function connectToWhatsApp(whatsappId: string) {
             const ownPhoneNumber =
               user?.id?.split(":")[0] || user?.id?.split("@")[0];
 
-            // Extract lid and pn using remoteJid and remoteJidAlt for better accuracy
-            const { lid, pn } = extractLidAndPn(
-              msg.key.remoteJid,
-              (msg.key as { remoteJidAlt?: string }).remoteJidAlt
-            );
+            // For direct messages, use remoteJid/remoteJidAlt
+            // For group messages, use participant/participantAlt (senderId is already participant)
+            let contactJid: string | undefined;
+            let contactJidAlt: string | undefined;
+
+            if (isGroupChat) {
+              // In group messages, senderId is the participant (who sent the message)
+              contactJid = msg.key.participant!;
+              contactJidAlt = (msg.key as { participantAlt?: string }).participantAlt;
+            } else {
+              // In direct messages, use remoteJid
+              contactJid = msg.key.remoteJid;
+              contactJidAlt = (msg.key as { remoteJidAlt?: string }).remoteJidAlt;
+            }
+
+            // Extract lid and pn from the contact JIDs
+            const { lid, pn } = extractLidAndPn(contactJid, contactJidAlt);
 
             // Determine correct lid and pn values (only valid ones)
             const validLid: string | null =
@@ -795,7 +925,7 @@ export async function connectToWhatsApp(whatsappId: string) {
                     });
 
                     console.log(
-                      `[messages.upsert] Created new contact from message: ${pushName} - lid: ${validLid || "empty"}, pn: ${validPn || "empty"}`,
+                      `[messages.upsert] Created new contact from ${isGroupChat ? 'group' : 'direct'} message: ${pushName} - lid: ${validLid || "empty"}, pn: ${validPn || "empty"}`,
                     );
                   } catch (e) {
                     console.error(
@@ -1257,6 +1387,32 @@ export async function forceResetSession(whatsappId: string) {
   }
 
   console.log(`[Session] Session reset complete for ${whatsappId}`);
+}
+
+// Reconnect to trigger a fresh sync (without clearing session - no QR needed)
+export async function reconnectForSync(whatsappId: string): Promise<void> {
+  console.log(`[Sync] Reconnecting ${whatsappId} to trigger contact sync...`);
+
+  const sock = sessions.get(whatsappId);
+  if (sock) {
+    try {
+      // End current connection gracefully
+      sock.end(undefined);
+    } catch (e) {
+      console.error("Error ending socket for sync:", e);
+    }
+    sessions.delete(whatsappId);
+    qrs.delete(whatsappId);
+    connectingLocks.delete(whatsappId);
+  }
+
+  // Wait a moment before reconnecting
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // Reconnect - this will trigger messaging-history.set and contacts.upsert events
+  await connectToWhatsApp(whatsappId);
+
+  console.log(`[Sync] Reconnection initiated for ${whatsappId}`);
 }
 
 export function getSocket(whatsappId: string) {
