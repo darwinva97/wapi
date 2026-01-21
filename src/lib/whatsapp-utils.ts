@@ -40,19 +40,26 @@ export function normalizeContactData(
   contact: Contact | Partial<Contact>,
 ): NormalizedContactData {
   const id = contact.id || "";
+  const contactExt = contact as Contact & { lid?: string; phoneNumber?: string };
 
   let lid: string | null = null;
   let pn: string | null = null;
 
+  // Extract LID from id or lid property
   if (id.includes("@lid")) {
     lid = id;
-  } else if (id.includes("@s.whatsapp.net")) {
-    pn = id;
+  } else if (contactExt.lid && contactExt.lid.includes("@lid")) {
+    lid = contactExt.lid;
   }
 
-  const contactWithLid = contact as Contact & { lid?: string };
-  if (contactWithLid.lid && !lid) {
-    lid = contactWithLid.lid;
+  // Extract PN from id or phoneNumber property
+  if (id.includes("@s.whatsapp.net")) {
+    pn = id;
+  } else if (contactExt.phoneNumber) {
+    // phoneNumber might be just the number or the full JID
+    pn = contactExt.phoneNumber.includes("@")
+      ? contactExt.phoneNumber
+      : `${contactExt.phoneNumber}@s.whatsapp.net`;
   }
 
   return {

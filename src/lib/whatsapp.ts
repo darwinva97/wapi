@@ -321,18 +321,24 @@ export async function connectToWhatsApp(whatsappId: string) {
 
           if (!existing) {
             // Insert
-            const pushName =
-              normalized.pn ||
+            // pushName/notifyName is the name the user set for themselves in WhatsApp
+            const realPushName =
               normalized.notifyName ||
               normalized.verifiedName ||
-              normalized.lid ||
+              null;
+            // contactName is the name YOU saved for this contact in your phone
+            const displayName =
+              normalized.contactName ||
+              realPushName ||
+              normalized.pn?.split("@")[0] ||
+              normalized.lid?.split("@")[0] ||
               "Unknown";
             try {
               await db.insert(contactTable).values({
                 id: crypto.randomUUID(),
                 whatsappId,
-                name: normalized.contactName || pushName, // Use pushName as fallback for name
-                pushName,
+                name: displayName,
+                pushName: realPushName || displayName,
                 lid: normalized.lid || "",
                 pn: normalized.pn || "",
                 description: "",
