@@ -687,8 +687,11 @@ export async function connectToWhatsApp(whatsappId: string) {
             const ownPhoneNumber =
               user?.id?.split(":")[0] || user?.id?.split("@")[0];
 
-            // Extract lid and pn using utility function
-            const { lid, pn } = extractLidAndPn(senderId);
+            // Extract lid and pn using remoteJid and remoteJidAlt for better accuracy
+            const { lid, pn } = extractLidAndPn(
+              msg.key.remoteJid,
+              (msg.key as { remoteJidAlt?: string }).remoteJidAlt
+            );
 
             // Determine correct lid and pn values (only valid ones)
             const validLid: string | null =

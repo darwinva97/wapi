@@ -222,28 +222,46 @@ export const get_Receiver_and_Sender_and_Context_FromMessage = (param: {
 export function extractLidAndPn(
   remoteJid?: string,
   remoteJidAlt?: string,
-): { lid: string; pn: string } {
+): { lid: string | null; pn: string | null } {
   const jid1 = remoteJid || "";
   const jid2 = remoteJidAlt || "";
 
+  // Check if jid1 is a LID
   if (jid1.includes("@lid")) {
     return {
       lid: jid1,
-      pn: jid2 || jid1.split("@")[0] || "unknown",
-    };
-  } else if (jid2.includes("@lid")) {
-    return {
-      lid: jid2,
-      pn: jid1 || jid2.split("@")[0] || "unknown",
+      pn: jid2.includes("@s.whatsapp.net") ? jid2 : null,
     };
   }
 
-  console.log(remoteJid, remoteJidAlt, "______");
-  console.log(jid1, jid2, "______");
+  // Check if jid2 is a LID
+  if (jid2.includes("@lid")) {
+    return {
+      lid: jid2,
+      pn: jid1.includes("@s.whatsapp.net") ? jid1 : null,
+    };
+  }
 
+  // Check if jid1 is a PN (no LID available)
+  if (jid1.includes("@s.whatsapp.net")) {
+    return {
+      lid: jid2.includes("@lid") ? jid2 : null,
+      pn: jid1,
+    };
+  }
+
+  // Check if jid2 is a PN
+  if (jid2.includes("@s.whatsapp.net")) {
+    return {
+      lid: jid1.includes("@lid") ? jid1 : null,
+      pn: jid2,
+    };
+  }
+
+  // No valid identifiers found
   return {
-    lid: jid1, // Fallback, might not be a real LID if it doesn't have @lid
-    pn: jid1.split("@")[0] || "unknown",
+    lid: null,
+    pn: null,
   };
 }
 
