@@ -1,11 +1,11 @@
-import { auth } from "@/lib/auth";
 import { db } from "@/db";
 import { whatsappTable } from "@/db/schema";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { updateWhatsappAction } from "./actions";
+import { DeleteWhatsappButton } from "./delete-whatsapp-button";
+import { getWhatsappBySlugWithRole } from "@/lib/auth-utils";
 
 export default async function EditWhatsappPage({
   params,
@@ -13,24 +13,11 @@ export default async function EditWhatsappPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
 
-  if (!session) {
-    redirect("/login");
-  }
+  // Require at least manager role to edit, get actual role for delete button visibility
+  const { wa, role } = await getWhatsappBySlugWithRole(slug, "manager");
 
-  const wa = await db.query.whatsappTable.findFirst({
-    where: and(
-      eq(whatsappTable.slug, slug),
-      eq(whatsappTable.userId, session.user.id)
-    ),
-  });
-
-  if (!wa) {
-    notFound();
-  }
+  const isOwner = role === "owner";
 
   async function updateAction(formData: FormData) {
     "use server";
@@ -100,6 +87,16 @@ export default async function EditWhatsappPage({
               </button>
             </div>
           </form>
+
+          {isOwner && (
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <h3 className="text-sm font-medium text-gray-900 mb-2">Zona de peligro</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Una vez eliminada, la instancia no podrá ser recuperada.
+              </p>
+              <DeleteWhatsappButton slug={wa.slug} name={wa.name} />
+            </div>
+          )}
         </div>
       </div>
     </div>

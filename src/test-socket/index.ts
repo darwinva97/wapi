@@ -7,6 +7,13 @@ import makeWASocket, {
 import pino from "pino";
 import fs from "fs";
 import path from "path";
+import { get_Receiver_and_Sender_and_Context_FromMessage } from "../lib/whatsapp-utils";
+import type {
+  YoEscriboAContacto,
+  ContactoMeEscribe,
+  YoEscriboAGrupo,
+  GrupoMeEscribe,
+} from "../lib/whatsapp-types";
 
 const SESSIONS_DIR = "whatsapp_sessions";
 
@@ -43,6 +50,39 @@ async function main() {
 
   sock.ev.on("creds.update", saveCreds);
 
+  // Listen for incoming messages and parse them with get_Receiver_and_Sender_and_Context_FromMessage
+  sock.ev.on("messages.upsert", async (m) => {
+    for (const msg of m.messages) {
+      // Skip broadcast messages
+      if (msg.broadcast) continue;
+
+      const result = get_Receiver_and_Sender_and_Context_FromMessage(
+        msg as unknown as {
+          key: YoEscriboAContacto | ContactoMeEscribe | YoEscriboAGrupo | GrupoMeEscribe;
+          pushName: string;
+          broadcast: boolean;
+          messageTimestamp: number;
+        }
+      );
+
+      if (!result) {
+        console.log("[SKIP] Could not parse message:", msg.key);
+        continue;
+      }
+
+      const { messageId, messageTimestamp, receiver, sender, context } = result;
+
+      console.log("\n========== NEW MESSAGE ==========");
+      console.log("Message ID (for DB):", messageId);
+      console.log("Timestamp:", new Date(messageTimestamp * 1000).toISOString());
+      console.log("Context:", JSON.stringify(context, null, 2));
+      console.log("Sender:", JSON.stringify(sender, null, 2));
+      console.log("Receiver:", JSON.stringify(receiver, null, 2));
+      console.log("Body:", msg.message?.conversation || msg.message?.extendedTextMessage?.text || "[media/other]");
+      console.log("=================================\n");
+    }
+  });
+
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect } = update;
 
@@ -59,21 +99,34 @@ async function main() {
         console.log("\n--- Socket ready for sending messages ---");
         console.log("To send a message, modify testJid variable with a valid JID");
         console.log("Example: 5491112345678@s.whatsapp.net");
-        console.log("\nPress Ctrl+C to exit");
+        console.log("\nListening for incoming messages...");
+        console.log("Press Ctrl+C to exit\n");
         return;
       }
 
       try {
         console.log(`\nSending message to ${testJid}...`);
-        const result = await sock.sendMessage(testJid, { text: testMessage });
-        console.log("Message sent successfully!");
-        console.log("Result:", JSON.stringify(result, null, 2));
+        const sentResult = await sock.sendMessage(testJid, { text: testMessage });
+
+        if (sentResult) {
+          // Parse the sent message with our function
+          const parsedSent = get_Receiver_and_Sender_and_Context_FromMessage({
+            key: sentResult.key as YoEscriboAContacto | ContactoMeEscribe | YoEscriboAGrupo | GrupoMeEscribe,
+            pushName: sock.user?.name || "",
+            broadcast: false,
+            messageTimestamp: Math.floor(Date.now() / 1000),
+          });
+
+          console.log("\n========== SENT MESSAGE ==========");
+          console.log("Message ID (for DB):", parsedSent?.messageId);
+          console.log("Context:", JSON.stringify(parsedSent?.context, null, 2));
+          console.log("Sender:", JSON.stringify(parsedSent?.sender, null, 2));
+          console.log("Receiver:", JSON.stringify(parsedSent?.receiver, null, 2));
+          console.log("==================================\n");
+        }
       } catch (error) {
         console.error("Error sending message:", error);
       }
-
-      // Keep the connection open or close it
-      // sock.end(undefined);
     }
 
     if (connection === "close") {

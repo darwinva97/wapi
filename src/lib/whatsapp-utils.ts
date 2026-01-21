@@ -107,7 +107,20 @@ export const get_Receiver_and_Sender_and_Context_FromMessage = (param: {
   pushName: string;
   broadcast: boolean;
   messageTimestamp: number;
-}) => {
+}): {
+  messageId: string;
+  messageTimestamp: number;
+  context:
+    | {
+        type: "personal";
+      }
+    | {
+        type: "group";
+        gid: `${string}@g.us`;
+      };
+  sender: (TPersonId | "me");
+  receiver: (TPersonId | "me" | "group");
+} | null => {
   const { key, pushName, broadcast, messageTimestamp } = param;
 
   if (broadcast) return null;
@@ -125,7 +138,7 @@ export const get_Receiver_and_Sender_and_Context_FromMessage = (param: {
       }
     | {
         type: "group";
-        gid: string;
+        gid: `${string}@g.us`;
       }
     | null = null;
 
@@ -150,7 +163,7 @@ export const get_Receiver_and_Sender_and_Context_FromMessage = (param: {
   if (yoEscriboAGrupo.success) {
     context = {
       type: "group",
-      gid: yoEscriboAGrupo.data.remoteJid,
+      gid: yoEscriboAGrupo.data.remoteJid as `${string}@g.us`,
     };
     sender = "me";
     receiver = "group";
@@ -177,7 +190,7 @@ export const get_Receiver_and_Sender_and_Context_FromMessage = (param: {
   if (alguienDelGrupoMeEscribe.success) {
     context = {
       type: "group",
-      gid: alguienDelGrupoMeEscribe.data.remoteJid,
+      gid: alguienDelGrupoMeEscribe.data.remoteJid as `${string}@g.us`,
     };
     receiver = "me";
     if (alguienDelGrupoMeEscribe.data.addressingMode === "lid") {
@@ -194,6 +207,8 @@ export const get_Receiver_and_Sender_and_Context_FromMessage = (param: {
       };
     }
   }
+
+  if (!context || !sender || !receiver) return null;
 
   return {
     messageId: key.id,
