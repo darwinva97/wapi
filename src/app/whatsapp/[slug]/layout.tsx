@@ -31,6 +31,7 @@ import { Suspense } from "react";
 import { db } from "@/db";
 import { whatsappTable, whatsappMemberTable } from "@/db/schema";
 import { eq, or, inArray } from "drizzle-orm";
+import { ClientLayout } from "./client-layout";
 
 function SidebarItem({
 	href,
@@ -103,6 +104,7 @@ async function WhatsappLayout({
 				});
 
 	return (
+		<ClientLayout whatsappId={wa.id}>
 		<div className="flex h-screen bg-background">
 			{/* Sidebar */}
 			<aside className="w-56 border-r flex flex-col bg-muted/30">
@@ -231,6 +233,7 @@ async function WhatsappLayout({
 				</div>
 			</div>
 		</div>
+		</ClientLayout>
 	);
 }
 export default function WhatsappLayoutWrapper(props: {

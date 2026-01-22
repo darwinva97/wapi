@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition, Fragment } from "react";
+import { useEffect, useRef, useState, useTransition, Fragment, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { AudioPlayer } from "./audio-player";
@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { sendReactionAction } from "./chat-actions";
+import { useSocket, type SocketMessage } from "@/hooks/use-socket";
 
 interface Reaction {
   id: string;
@@ -39,6 +40,7 @@ interface ChatMessagesProps {
   initialMessages: Message[];
   chatId: string;
   slug: string;
+  whatsappId: string;
   senderNames?: Record<string, string>;
   isGroup?: boolean;
 }
@@ -77,11 +79,12 @@ function renderTextWithLinks(text: string, fromMe: boolean) {
   });
 }
 
-export function ChatMessages({ initialMessages, chatId, slug, senderNames = {}, isGroup = false }: ChatMessagesProps) {
+export function ChatMessages({ initialMessages, chatId, slug, whatsappId, senderNames = {}, isGroup = false }: ChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPending, startTransition] = useTransition();
   const [openReactionId, setOpenReactionId] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const handleReaction = (messageId: string, emoji: string) => {
     setOpenReactionId(null);
@@ -93,12 +96,51 @@ export function ChatMessages({ initialMessages, chatId, slug, senderNames = {}, 
       }
     });
   };
-  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Handle new messages from Socket.IO
+  const handleSocketMessage = useCallback((newMessage: SocketMessage) => {
+    console.log("Socket.IO Message received:", newMessage);
+    // Convert timestamp string back to Date object
+    const timestamp = newMessage.timestamp instanceof Date
+      ? newMessage.timestamp
+      : new Date(newMessage.timestamp);
+
+    setMessages((prev) => {
+      // Handle ack updates
+      if (newMessage.isAckUpdate) {
+        return prev.map(m =>
+          m.id === newMessage.id
+            ? { ...m, ackStatus: newMessage.ackStatus }
+            : m
+        );
+      }
+
+      // Avoid duplicates for new messages
+      if (prev.some(m => m.id === newMessage.id)) return prev;
+      return [...prev, { ...newMessage, timestamp }];
+    });
+  }, []);
+
+  // Use Socket.IO hook for real-time updates
+  const { isConnected } = useSocket({
+    whatsappId,
+    chatId,
+    onMessage: handleSocketMessage,
+    onMessageUpdate: (update) => {
+      if (update.ackStatus !== undefined) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === update.id ? { ...m, ackStatus: update.ackStatus } : m
+          )
+        );
+      }
+    },
+  });
 
   // Sync state with initialMessages when they change
   useEffect(() => {
     // Merge: prefer initialMessages data for existing messages (has reactions),
-    // but keep SSE messages that aren't in initialMessages yet
+    // but keep socket messages that aren't in initialMessages yet
     const merged: Message[] = [];
     const seenIds = new Set<string>();
 
@@ -130,53 +172,6 @@ export function ChatMessages({ initialMessages, chatId, slug, senderNames = {}, 
     // Scroll to bottom when messages change
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  useEffect(() => {
-    console.log("Connecting to SSE for chat:", chatId);
-    const eventSource = new EventSource(`/api/sse/chat/${encodeURIComponent(chatId)}`);
-
-    eventSource.onopen = () => {
-      console.log("SSE Connected");
-    };
-
-    eventSource.onmessage = (event) => {
-      console.log("SSE Message received:", event.data);
-      try {
-        const newMessage = JSON.parse(event.data);
-        // Convert timestamp string back to Date object
-        if (newMessage.timestamp) {
-          newMessage.timestamp = new Date(newMessage.timestamp);
-        }
-        
-        setMessages((prev) => {
-          // Handle ack updates
-          if (newMessage.isAckUpdate) {
-            return prev.map(m => 
-              m.id === newMessage.id 
-                ? { ...m, ackStatus: newMessage.ackStatus }
-                : m
-            );
-          }
-          
-          // Avoid duplicates for new messages
-          if (prev.some(m => m.id === newMessage.id)) return prev;
-          return [...prev, newMessage];
-        });
-      } catch (e) {
-        console.error("Error parsing SSE message:", e);
-      }
-    };
-
-    eventSource.onerror = (err) => {
-      console.error("SSE Error:", err);
-      eventSource.close();
-    };
-
-    return () => {
-      console.log("Closing SSE connection");
-      eventSource.close();
-    };
-  }, [chatId]);
 
   return (
     <ScrollArea className="flex-1 min-h-0 overflow-auto" ref={scrollRef}>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { connectWhatsappAction, disconnectWhatsappAction, syncConnectionStateAction } from "./actions";
 import { QRCodeSVG } from "qrcode.react";
 import { useRouter } from "next/navigation";
+import { useSocket, type WhatsappStatus } from "@/hooks/use-socket";
 
 export function ConnectButton({ id, isConnected: initialIsConnected }: { id: string, isConnected: boolean }) {
   const [loading, setLoading] = useState(false);
@@ -81,38 +82,37 @@ export function ConnectButton({ id, isConnected: initialIsConnected }: { id: str
     }
   }
 
-  useEffect(() => {
-    if (!showModal) return;
+  // Handle QR code from Socket.IO
+  const handleQr = useCallback((qr: string) => {
+    console.log("QR received via Socket.IO");
+    setQrCode(qr);
+    setStatus("scan_qr");
+  }, []);
 
-    const eventSource = new EventSource(`/api/whatsapp/${id}/qr`);
+  // Handle status updates from Socket.IO
+  const handleStatus = useCallback((statusData: WhatsappStatus) => {
+    console.log("Status received via Socket.IO:", statusData);
+    if (statusData.status === "open") {
+      setStatus("connected");
+      setIsConnected(true);
+      setTimeout(() => {
+        setShowModal(false);
+        setLoading(false);
+        router.refresh();
+      }, 1000);
+    } else if (statusData.status === "connecting") {
+      setStatus("connecting");
+    } else if (statusData.status === "close") {
+      setIsConnected(false);
+    }
+  }, [router]);
 
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "qr") {
-        setQrCode(data.qr);
-        setStatus("scan_qr");
-      } else if (data.type === "status") {
-        if (data.status === "open") {
-          setStatus("connected");
-          eventSource.close();
-          setTimeout(() => {
-            setShowModal(false);
-            router.refresh();
-          }, 1000);
-        } else if (data.status === "connecting") {
-          setStatus("connecting");
-        }
-      }
-    };
-
-    eventSource.onerror = (err) => {
-      console.error("SSE Error:", err);
-    };
-
-    return () => {
-      eventSource.close();
-    };
-  }, [showModal, id, router]);
+  // Use Socket.IO hook for real-time QR and status updates
+  useSocket({
+    whatsappId: id,
+    onQr: showModal ? handleQr : undefined,
+    onStatus: handleStatus,
+  });
 
   const modalContent = showModal ? (
     <div className="fixed inset-0 z-9999 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">

@@ -24,7 +24,8 @@
       "Bash(ss:*)",
       "Bash(curl:*)",
       "Bash(pgrep:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(corepack prepare:*)"
     ]
   }
 }
