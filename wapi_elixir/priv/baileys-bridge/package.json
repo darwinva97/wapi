@@ -1,0 +1,14 @@
+{
+  "name": "wapi-baileys-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Baileys bridge for Elixir/OTP WAPI backend",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "baileys": "7.0.0-rc.9",
+    "pino": "^10.1.0"
+  }
+}

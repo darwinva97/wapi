@@ -1,202 +1,367 @@
-# WAPI - WhatsApp API Gateway
+# WAPI - WhatsApp Integration Platform
 
-Dashboard y API para integrar WhatsApp en tus aplicaciones. Conecta múltiples cuentas de WhatsApp, envía mensajes via API y recibe webhooks cuando llegan mensajes.
+Plataforma multi-tenant para integrar WhatsApp en tus aplicaciones. Conecta multiples cuentas de WhatsApp simultaneamente, envia mensajes via API REST, recibe webhooks, y visualiza chats en tiempo real.
 
-## ✨ Características
+**Frontend** en Next.js 16 + **Backend** en Elixir/OTP, compartiendo la misma base de datos PostgreSQL.
 
-### 📱 Gestión de Cuentas WhatsApp
-- Conecta múltiples cuentas de WhatsApp via QR code
-- Dashboard para administrar todas tus cuentas
-- Estado de conexión en tiempo real
-- Almacenamiento de sesiones persistente
+```
+wapi/
+├── src/                    # Next.js frontend (React 19, TypeScript)
+├── wapi_elixir/            # Elixir/OTP backend (Phoenix 1.7, Broadway, Oban)
+├── docs/                   # Documentacion de arquitectura y migracion
+└── drizzle/                # Migraciones Drizzle ORM
+```
 
-### 🔗 Conexiones (Integraciones)
-Cada cuenta de WhatsApp puede tener múltiples "conexiones", que son integraciones bidireccionales:
+---
 
-#### 📤 Sender (Enviar mensajes via API)
-- API REST para enviar mensajes
-- Autenticación via Bearer token
-- Soporte para mensajes de texto, imágenes, documentos, etc.
-- Endpoint: `POST /api/{whatsapp_slug}/{connection_slug}/sender`
+## Arquitectura
 
-#### 📥 Receiver (Webhooks)
-- Recibe mensajes entrantes via webhook
-- Configura URLs personalizadas para cada conexión
-- Headers personalizados para autenticación
-- Payload completo del mensaje incluyendo metadatos
+```
+┌──────────────────────┐     ┌───────────────────────────────────────────┐
+│   Next.js Frontend   │     │          Elixir/OTP Backend               │
+│   (port 3000)        │     │          (port 4000)                      │
+│                      │     │                                           │
+│  - React 19 UI       │◄───►│  Phoenix Channels (WebSocket)             │
+│  - Chat interface    │ ws  │    ├─ chat:*    (mensajes, typing)        │
+│  - Admin panel       │     │    ├─ qr:*      (QR code streaming)      │
+│  - Auth (better-auth)│     │    └─ session:* (estado de conexion)      │
+│                      │     │                                           │
+│  - SSR / API routes  │     │  REST API                                 │
+│                      │     │    ├─ POST /api/v1/:wa/:conn/sender       │
+│                      │     │    ├─ GET  /health                        │
+│                      │     │    └─ /api/v1/sessions/* (CRUD)           │
+└──────────┬───────────┘     │                                           │
+           │                 │  WhatsApp Session Management               │
+           │                 │    ├─ GenServer por sesion (OTP)           │
+           │                 │    ├─ DynamicSupervisor (fault-tolerant)   │
+           │                 │    └─ Node.js sidecar (Baileys 7.0)       │
+           │                 │                                           │
+           │  shared DB      │  Broadway Pipeline                        │
+           ▼                 │    └─ 10 processors → DB batch insert     │
+    ┌─────────────┐         │                                           │
+    │ PostgreSQL   │◄────────│  Oban Workers                             │
+    │ (Neon/local) │         │    ├─ WebhookWorker (entrega + reintentos)│
+    └─────────────┘         │    ├─ CleanupWorker  (retencion de media) │
+                             │    └─ SyncWorker     (reconciliacion)     │
+                             └───────────────────────────────────────────┘
+```
 
-### 👥 Gestión de Contactos y Grupos
-- Sincronización automática de contactos
-- Gestión de grupos de WhatsApp
-- Historial de mensajes por chat
+Ambos servicios comparten la **misma base de datos PostgreSQL**. El frontend maneja autenticacion y UI. El backend maneja toda la comunicacion WhatsApp, procesamiento de mensajes, y entrega en tiempo real.
 
-### 🔐 Sistema de Usuarios
-- Autenticación segura con Better Auth
-- Roles de usuario (admin/user)
-- Registro público deshabilitado (solo admins crean usuarios)
-- API de administración para gestión de usuarios
+---
 
-### 💬 Chat en Tiempo Real
-- Visualización de chats y mensajes
-- Actualizaciones via Server-Sent Events (SSE)
-- Historial de mensajes almacenado en base de datos
-- **Soporte multimedia completo**: imágenes, videos, audio, stickers y documentos
-- **Tracking de estados de entrega**: pendiente, enviado, entregado y leído
-- Almacenamiento de archivos multimedia en el servidor
+## Stack Tecnologico
 
-## 🛠️ Stack Tecnológico
+| Capa | Tecnologia |
+|------|-----------|
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, Radix UI, shadcn/ui |
+| Backend | Elixir 1.17+, Phoenix 1.7, Broadway, Oban, GenStage |
+| WhatsApp | Baileys 7.0-rc.9 (sidecar Node.js via Erlang Port) |
+| Base de datos | PostgreSQL 16+ (compatible con Neon), Ecto / Drizzle ORM |
+| Autenticacion | better-auth (sesiones compartidas en DB) |
+| Tiempo real | Phoenix Channels (WebSocket) + PubSub |
+| Jobs | Oban (colas respaldadas por PostgreSQL, cron) |
+| Rate Limiting | PlugAttack (60 req/min por token, 120 req/min por IP) |
+| Validacion | Zod (frontend), Ecto Changesets (backend) |
 
-- **Framework:** Next.js 16 (App Router)
-- **Base de datos:** SQLite / Turso (LibSQL)
-- **ORM:** Drizzle ORM
-- **WhatsApp:** Baileys
-- **Autenticación:** Better Auth
-- **UI:** Tailwind CSS + shadcn/ui
-- **Validación:** Zod
+---
 
-## 🚀 Instalación
+## Prerequisitos
 
-### Prerrequisitos
-- Node.js 20+
-- pnpm
+- **Node.js** >= 20
+- **Elixir** >= 1.17 con Erlang/OTP >= 27
+- **PostgreSQL** 16+ (o Neon serverless)
+- **pnpm** (para el frontend)
 
-### 1. Clonar e instalar dependencias
+---
+
+## Inicio Rapido
+
+### 1. Clonar y configurar
 
 ```bash
-git clone <repo-url>
+git clone <repo-url> wapi
 cd wapi
-pnpm install
-```
-
-### 2. Configurar variables de entorno
-
-Copia el archivo de ejemplo y configura tus valores:
-
-```bash
 cp .env.example .env
+# Edita .env con tu DATABASE_URL y secrets
 ```
 
-Variables requeridas:
-
-```env
-# Base de datos (SQLite local o Turso)
-DATABASE_URL=file:local.db
-DATABASE_AUTH_TOKEN=
-
-# Better Auth
-BETTER_AUTH_URL=http://localhost:3000
-BETTER_AUTH_SECRET=tu-clave-secreta-minimo-32-caracteres
-
-# Entorno
-NODE_ENV=development
-```
-
-### 3. Crear tablas en la base de datos
+### 2. Frontend (Next.js)
 
 ```bash
-pnpm db:push
+pnpm install
+pnpm db:push          # Push del schema Drizzle a la DB
+pnpm db:seed          # Crear usuario admin
+pnpm dev              # http://localhost:3000
 ```
 
-### 4. Crear carpeta para archivos multimedia
-
-```bash
-mkdir -p public/media
-```
-
-La carpeta `public/media` almacenará los archivos multimedia (imágenes, videos, audio, documentos) recibidos en los mensajes. Los archivos se organizan por cuenta de WhatsApp y fecha.
-
-### 5. Crear usuario administrador
-
-```bash
-pnpm db:seed
-```
-
-Credenciales por defecto:
+Credenciales por defecto del seed:
 - **Email:** admin@example.com
 - **Password:** Admin123!
 
-### 5. Iniciar el servidor
+### 3. Backend (Elixir/OTP)
 
 ```bash
-pnpm dev
+cd wapi_elixir
+
+# Instalar dependencias
+mix deps.get
+cd priv/baileys-bridge && npm install && cd ../..
+
+# Configurar base de datos (Neon requiere SSL)
+export DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
+
+# Correr migraciones e iniciar
+mix ecto.migrate
+mix phx.server        # http://localhost:4000
 ```
 
-Abre [http://localhost:3000](http://localhost:3000)
+### 4. Verificar
 
-## 📖 Uso
+```bash
+# Health check del backend
+curl http://localhost:4000/health
+# => {"status":"ok","timestamp":"...","active_sessions":0}
+```
 
-### Conectar una cuenta de WhatsApp
+---
 
-1. Inicia sesión en el dashboard
-2. Crea una nueva cuenta de WhatsApp
-3. Escanea el código QR con tu teléfono
-4. ¡Listo! La cuenta está conectada
+## Variables de Entorno
+
+### Raiz (.env) - Frontend Next.js
+
+| Variable | Requerida | Descripcion |
+|----------|-----------|-------------|
+| `DATABASE_URL` | Si | Connection string de PostgreSQL |
+| `BETTER_AUTH_SECRET` | Si | Secret para firmar sesiones (32+ chars) |
+| `BETTER_AUTH_URL` | Si | URL base de auth (ej. `http://localhost:3000`) |
+
+### wapi_elixir - Backend Elixir
+
+| Variable | Requerida | Default | Descripcion |
+|----------|-----------|---------|-------------|
+| `DATABASE_URL` | Si | - | URL de PostgreSQL (ecto:// o postgresql://) |
+| `SECRET_KEY_BASE` | Prod | dev default | Clave de firma Phoenix (64+ chars) |
+| `PORT` | No | `4000` | Puerto HTTP |
+| `PHX_HOST` | No | `localhost` | Hostname para generacion de URLs |
+| `POOL_SIZE` | No | `10` | Tamano del pool de conexiones DB |
+| `NODE_PATH` | No | `node` | Ruta al binario de Node.js |
+| `BRIDGE_SCRIPT` | No | `priv/baileys-bridge/index.js` | Ruta al bridge Baileys |
+| `SESSIONS_DIR` | No | `whatsapp_sessions` | Directorio de sesiones WhatsApp |
+
+---
+
+## Caracteristicas
+
+### Gestion de Cuentas WhatsApp
+- Conecta multiples cuentas de WhatsApp via QR code
+- Dashboard para administrar todas tus cuentas
+- Estado de conexion en tiempo real
+- Almacenamiento de sesiones persistente
+- Reconexion automatica con backoff exponencial (1s a 60s)
+
+### Conexiones (Integraciones)
+Cada cuenta de WhatsApp puede tener multiples "conexiones" bidireccionales:
+
+**Sender (Enviar mensajes via API)**
+- API REST con autenticacion Bearer token
+- Soporte para texto, imagenes, video, audio, documentos, stickers, ubicacion
+- Tracking de mensajes enviados con connection_id
+
+**Receiver (Webhooks)**
+- Recibe mensajes entrantes via webhook HTTP
+- URLs personalizadas por conexion
+- Headers de autenticacion configurables
+- Reintentos automaticos con backoff exponencial (max 5 intentos)
 
 ### Mensajes Multimedia
+| Tipo | Formato | Descripcion |
+|------|---------|-------------|
+| Texto | Texto plano | Mensajes estandar |
+| Imagenes | JPG, PNG, WebP | Se muestran inline en el chat |
+| Videos | MP4, MKV, etc. | Reproductor integrado |
+| Audio | OGG, MP3, etc. | Reproductor de audio |
+| Stickers | WebP | Stickers de WhatsApp |
+| Documentos | PDF, DOCX, etc. | Enlace de descarga |
+| Ubicacion | Lat/Lng | Mapa embebido |
 
-El sistema soporta los siguientes tipos de mensajes:
+### Estados de Entrega (ackStatus)
+Cada mensaje tiene un estado que se actualiza en tiempo real:
+- **0**: Pendiente - El mensaje esta en cola
+- **1**: Enviado - Entregado al servidor de WhatsApp
+- **2**: Entregado - Recibido por el destinatario
+- **3**: Leido - El destinatario leyo el mensaje
 
-- **Texto**: Mensajes de texto estándar
-- **Imágenes**: JPG, PNG, WebP (se muestran en el chat)
-- **Videos**: MP4, MKV, etc. (reproductor integrado)
-- **Audio**: OGG, MP3, etc. (reproductor de audio)
-- **Stickers**: Stickers de WhatsApp
-- **Documentos**: PDF, DOCX, etc. (enlace de descarga)
+### Multi-Tenancy
+- Cada instancia WhatsApp pertenece a un **usuario** (owner)
+- **Miembros** con roles: `owner`, `manager`, `agent`
+- Rate limiting por token y por IP
+- Aislamiento de sesiones via procesos OTP independientes
 
-Los archivos multimedia se almacenan en `public/media/{whatsapp_id}/{YYYY-MM-DD}/{message_id}_{filename}` y son accesibles vía URL pública.
+---
 
-#### Estados de Entrega (ackStatus)
+## Estructura del Proyecto
 
-Cada mensaje tiene un estado de entrega que se actualiza en tiempo real:
+### Frontend (`src/`)
 
-- **0**: Pendiente (⏱) - El mensaje está en cola o falló
-- **1**: Enviado (✓) - El mensaje fue enviado al servidor de WhatsApp
-- **2**: Entregado (✓✓) - El mensaje fue entregado al destinatario
-- **3**: Leído (✓✓ azul) - El destinatario leyó el mensaje
+```
+src/
+├── app/                          # Next.js App Router
+│   ├── (auth)/                   # Paginas de auth (login, signup)
+│   ├── admin/                    # Panel de administracion
+│   ├── whatsapp/[slug]/          # Dashboard por cuenta WhatsApp
+│   │   ├── connections/          # Gestion de conexiones
+│   │   └── chats/                # Visualizacion de chats
+│   └── api/                      # API routes
+│       ├── [wa_slug]/[conn_slug]/sender/  # Sender API
+│       ├── admin/                # Admin endpoints
+│       ├── auth/                 # Better Auth
+│       ├── sse/chat/             # SSE para chat (legacy)
+│       └── whatsapp/[id]/qr/    # SSE para QR (legacy)
+├── components/ui/                # Componentes shadcn/Radix
+├── db/
+│   └── schema/                   # Schema Drizzle ORM
+│       ├── user.ts               # user, session, account, verification
+│       ├── whatsapp.ts           # whatsapp, contact, group, message, reaction, poll
+│       └── config.ts             # platform_config, user_config, cleanup_config, etc.
+├── lib/
+│   ├── whatsapp.ts               # Gestion de sesiones Baileys (legacy)
+│   ├── storage.ts                # Almacenamiento (local + S3)
+│   └── cleanup-job.ts            # Limpieza de media
+└── hooks/                        # React hooks
+```
 
-Los estados se actualizan automáticamente vía SSE y se reflejan en la interfaz de chat.
+### Backend (`wapi_elixir/`)
 
-### Requisitos de Almacenamiento
+```
+wapi_elixir/
+├── lib/
+│   ├── wapi/
+│   │   ├── schema/                   # 19 Ecto schemas (espejo de Drizzle)
+│   │   ├── whatsapp/
+│   │   │   ├── session_server.ex     # GenServer por sesion WhatsApp
+│   │   │   ├── session_supervisor.ex # DynamicSupervisor (fault-tolerant)
+│   │   │   ├── session_bootstrap.ex  # Reconectar sesiones al iniciar
+│   │   │   └── node_bridge.ex        # Erlang Port ↔ Node.js Baileys
+│   │   ├── pipeline/
+│   │   │   ├── message_producer.ex   # GenStage producer (buffer de eventos)
+│   │   │   ├── message_parser.ex     # Deteccion de tipo de mensaje
+│   │   │   └── message_pipeline.ex   # Broadway (10 processors, batch DB)
+│   │   ├── workers/
+│   │   │   ├── webhook_worker.ex     # Entrega HTTP con backoff exponencial
+│   │   │   ├── cleanup_worker.ex     # Retencion de media (cron 3am)
+│   │   │   ├── sync_worker.ex        # Reconciliacion DB ↔ proceso
+│   │   │   └── orphan_session_worker.ex  # Limpieza de sesiones huerfanas
+│   │   ├── sender/sender.ex         # Enviar mensajes via Baileys
+│   │   ├── storage/storage.ex        # Almacenamiento local + S3
+│   │   └── authorization.ex          # Control de acceso owner/member
+│   └── wapi_web/
+│       ├── channels/
+│       │   ├── chat_channel.ex       # Mensajes de chat en tiempo real
+│       │   ├── qr_channel.ex         # Streaming de codigo QR
+│       │   └── session_channel.ex    # Actualizaciones de estado
+│       ├── controllers/
+│       │   ├── sender_controller.ex  # POST /api/v1/:wa/:conn/sender
+│       │   ├── session_controller.ex # CRUD de sesiones
+│       │   └── health_controller.ex  # GET /health
+│       ├── plugs/
+│       │   ├── auth.ex               # Autenticacion Bearer token
+│       │   └── rate_limiter.ex       # PlugAttack rate limiting
+│       └── router.ex
+├── priv/
+│   ├── baileys-bridge/               # Sidecar Node.js
+│   │   ├── index.js                  # Protocolo JSON stdin/stdout
+│   │   ├── session-manager.js        # Ciclo de vida de sesiones Baileys
+│   │   └── event-mapper.js           # Serializacion de eventos
+│   └── repo/migrations/              # Migraciones Ecto (5 archivos)
+├── config/                           # Configuracion compile-time + runtime
+├── Dockerfile                        # Multi-stage (Elixir + Node.js)
+└── docker-compose.yml                # Stack completo
+```
 
-- Los archivos multimedia se almacenan en el sistema de archivos del servidor
-- Considera el espacio en disco disponible según el volumen de mensajes multimedia
-- Recomendado: al menos 10 GB libres para uso normal
-- Para producción: considerar una solución de almacenamiento escalable (S3, Cloud Storage, etc.)
+---
 
-### Crear una conexión (integración)
+## Conceptos Clave
 
-1. Ve a la cuenta de WhatsApp
-2. Crea una nueva conexión
-3. Configura el Sender (para enviar mensajes):
-   - Habilita el sender
-   - Copia el token generado
-4. Configura el Receiver (para recibir mensajes):
-   - Habilita el receiver
-   - Ingresa la URL de tu webhook
-   - Agrega headers si es necesario
+### Gestion de Sesiones WhatsApp
+
+Cada cuenta de WhatsApp corre como un **GenServer** aislado, supervisado por un `DynamicSupervisor`. Las sesiones sobreviven crashes con reconexion automatica usando backoff exponencial.
+
+El protocolo WhatsApp corre en un **sidecar Node.js** (libreria Baileys) que se comunica con Elixir via un Erlang Port usando JSON delimitado por newlines en stdin/stdout.
+
+```
+Elixir (NodeBridge GenServer)
+    │
+    ├── stdin: {"action":"connect","whatsapp_id":"abc123"}
+    │
+    └── stdout: {"event":"messages.upsert","whatsapp_id":"abc123","data":{...}}
+    │
+Node.js (Baileys Bridge)
+    └── WhatsApp WebSocket connection
+```
+
+### Pipeline de Mensajes
+
+Los eventos entrantes de WhatsApp fluyen a traves de un **Broadway pipeline**:
+
+1. **NodeBridge** recibe eventos del sidecar JS
+2. **MessageProducer** bufferea eventos con control de flujo por demanda
+3. **10 procesadores** concurrentes parsean y validan mensajes
+4. **Batch inserter** escribe a PostgreSQL en lotes de 50
+5. **PubSub** broadcastea a clientes WebSocket conectados
+6. **Oban** agenda jobs de entrega de webhooks
+
+### Base de Datos
+
+19 tablas compartidas entre frontend y backend:
+
+| Grupo | Tablas |
+|-------|--------|
+| Auth | `user`, `session`, `account`, `verification` |
+| WhatsApp | `whatsapp`, `contact`, `group`, `connection` |
+| Mensajes | `message`, `reaction`, `poll`, `poll_vote` |
+| Config | `platform_config`, `user_config`, `whatsapp_member`, `whatsapp_cleanup_config`, `chat_config`, `chat_note`, `storage_config` |
+| Jobs | `oban_jobs`, `oban_peers` (interno de Oban) |
+
+Las migraciones se manejan con **Drizzle** (frontend) y **Ecto** (backend). Ambos usan `create_if_not_exists` para coexistir.
+
+---
+
+## API Reference
+
+### REST Endpoints
+
+| Metodo | Ruta | Auth | Descripcion |
+|--------|------|------|-------------|
+| `GET` | `/health` | Ninguna | Health check con conteo de sesiones activas |
+| `POST` | `/api/v1/:wa/:conn/sender` | Bearer (token de conexion) | Enviar mensaje WhatsApp |
+| `GET` | `/api/v1/sessions` | Bearer (sesion de usuario) | Listar sesiones activas |
+| `POST` | `/api/v1/sessions/:id/connect` | Bearer (sesion de usuario) | Conectar sesion WhatsApp |
+| `POST` | `/api/v1/sessions/:id/disconnect` | Bearer (sesion de usuario) | Desconectar sesion |
+| `DELETE` | `/api/v1/sessions/:id/reset` | Bearer (sesion de usuario) | Resetear sesion (borrar auth) |
 
 ### Enviar mensajes via API
 
 ```bash
-curl -X POST "http://localhost:3000/api/{whatsapp_slug}/{connection_slug}/sender" \
-  -H "Authorization: Bearer {tu-token}" \
+curl -X POST "http://localhost:4000/api/v1/{whatsapp_slug}/{connection_slug}/sender" \
+  -H "Authorization: Bearer {connection_sender_token}" \
   -H "Content-Type: application/json" \
   -d '{
-    "to": "1234567890",
+    "to": "5491112345678@s.whatsapp.net",
     "message": { "text": "Hola desde WAPI!" }
   }'
 ```
 
-### Formato del webhook (mensajes entrantes)
+### Formato del Webhook (mensajes entrantes)
 
-Tu endpoint recibirá un POST con este formato:
+Tu endpoint recibira un POST con este formato:
 
 ```json
 {
   "messages": [
     {
       "key": {
-        "remoteJid": "1234567890@s.whatsapp.net",
+        "remoteJid": "5491112345678@s.whatsapp.net",
         "fromMe": false,
         "id": "MESSAGE_ID"
       },
@@ -211,129 +376,118 @@ Tu endpoint recibirá un POST con este formato:
 }
 ```
 
-## 📁 Estructura del Proyecto
+### WebSocket Channels
 
-```
-src/
-├── app/
-│   ├── api/
-│   │   ├── [whatsapp_slug]/[connection_slug]/sender/  # API para enviar
-│   │   ├── admin/users/create/                        # API admin
-│   │   ├── auth/                                      # Better Auth
-│   │   └── whatsapp/[id]/qr/                         # SSE para QR
-│   ├── whatsapp/[slug]/                              # Dashboard WhatsApp
-│   │   ├── connections/[connectionSlug]/             # Gestión conexiones
-│   │   └── chats/                                    # Visualizar chats
-│   └── login/                                        # Página de login
-├── components/ui/                                    # Componentes shadcn
-├── db/
-│   ├── schema/                                       # Esquema Drizzle
-│   └── seed.ts                                       # Seeder
-├── lib/
-│   ├── auth.ts                                       # Configuración Better Auth
-│   ├── whatsapp.ts                                   # Lógica Baileys
-│   └── whatsapp-utils.ts                             # Utilidades
-└── config/                                           # Variables de entorno
-```
+Conectar a `ws://localhost:4000/socket` con parametro `token` (token de sesion better-auth).
 
-## 🔧 Scripts Disponibles
+| Channel | Eventos | Descripcion |
+|---------|---------|-------------|
+| `chat:{chat_id}` | `new_message`, `message_ack`, `typing` | Chat en tiempo real |
+| `qr:{whatsapp_id}` | `qr_code`, `status_change` | Flujo de emparejamiento QR |
+| `session:{whatsapp_id}` | `status_change` | Estado de conexion |
 
-| Comando | Descripción |
-|---------|-------------|
-| `pnpm dev` | Inicia el servidor de desarrollo |
-| `pnpm build` | Compila para producción |
-| `pnpm start` | Inicia el servidor de producción |
-| `pnpm db:push` | Aplica el esquema a la base de datos |
-| `pnpm db:studio` | Abre Drizzle Studio |
-| `pnpm db:seed` | Crea el usuario admin |
-| `pnpm lint` | Ejecuta ESLint |
+### LiveDashboard (solo dev)
 
-## �️ Roadmap
+Visita `http://localhost:4000/dev/dashboard` para monitorear procesos, tablas ETS, y metricas.
 
-Consulta el [CHANGELOG.md](CHANGELOG.md) para ver las características planeadas. Algunas de las próximas mejoras incluyen:
+---
 
-### Receiver Filter Avanzado
-El filtro de receiver actual solo soporta JSON estático. Próximamente:
+## Docker
 
-- **Evaluación JavaScript**: Escribir funciones JS que evalúen mensajes
-  ```javascript
-  (msg) => !msg.key.fromMe && msg.message?.conversation?.includes("pedido")
-  ```
-
-- **Plantillas HTTP**: Validar mensajes contra una API externa antes de enviar el webhook
-  ```json
-  {
-    "type": "http",
-    "url": "https://mi-api.com/validate",
-    "expectStatus": 200
-  }
-  ```
-
-### Otras Mejoras Planeadas
-- 📊 Métricas y estadísticas de uso
-- 🔄 Retry automático de webhooks fallidos
-- 📝 Templates de mensajes reutilizables
-- 🔗 Transformadores de payload personalizados
-- ⏰ Mensajes programados
-- 🔐 Seguridad avanzada (HMAC, IP whitelist)
-- 🤖 Integraciones nativas (n8n, Zapier)
-- 💬 Respuestas automáticas configurables
-
-## � Despliegue
-
-### Docker y Kubernetes
-
-Este proyecto está listo para desplegarse en contenedores Docker y en clusters de Kubernetes (k8s, k3s, minikube, etc.):
-
-#### Docker Local
+### Desarrollo (stack completo)
 
 ```bash
-# Desarrollo con hot reload
-docker-compose --profile dev up wapi-dev
-
-# Producción
-docker-compose up
+cd wapi_elixir
+docker compose up
+# PostgreSQL (5432) + Elixir backend (4000) + Next.js frontend (3000)
 ```
 
-#### Kubernetes
+### Produccion (solo Elixir)
 
 ```bash
-# Despliegue completo (construir, subir, desplegar)
+cd wapi_elixir
+docker build -t wapi-elixir .
+docker run \
+  -e DATABASE_URL="postgresql://..." \
+  -e SECRET_KEY_BASE="$(mix phx.gen.secret)" \
+  -e PHX_HOST="tudominio.com" \
+  -p 4000:4000 \
+  wapi-elixir
+```
+
+El Dockerfile usa un build multi-stage: release de Elixir + bridge Node.js + runtime Debian slim.
+
+### Kubernetes
+
+```bash
 IMAGE_NAME=your-registry/wapi IMAGE_TAG=v1.0.0 ./deploy.sh full
-
-# Ver estado
-./deploy.sh status
-
-# Ver logs
-./deploy.sh logs
 ```
 
-**Documentación completa:**
-- [Guía Rápida de Kubernetes](docs/KUBERNETES_QUICKSTART.md) - Inicio rápido
-- [Documentación Completa de Kubernetes](docs/KUBERNETES.md) - Guía detallada
-- [Guía Específica para k3s](docs/K3S.md) - Despliegue en k3s
+Documentacion completa en:
+- [Guia Rapida de Kubernetes](docs/KUBERNETES_QUICKSTART.md)
+- [Documentacion Completa](docs/KUBERNETES.md)
+- [Guia para k3s](docs/K3S.md)
 
-**Características del despliegue en Kubernetes:**
-- ✅ Multi-stage Dockerfile optimizado
-- ✅ Manifiestos completos de K8s (Deployment, Service, Ingress, PVC)
-- ✅ Volúmenes persistentes para sesiones y media
-- ✅ ConfigMaps y Secrets para configuración
-- ✅ Health checks y resource limits
-- ✅ Script de despliegue automatizado
-- ✅ Soporte para Kustomize
+---
 
-## 📚 Documentación Adicional
+## Scripts
 
-- [API de Administración](docs/ADMIN_API.md)
-- **Despliegue en Kubernetes:**
-  - [Guía Rápida](docs/KUBERNETES_QUICKSTART.md)
-  - [Documentación Completa](docs/KUBERNETES.md)
-  - [Guía para k3s](docs/K3S.md) - Despliegue en k3s
-  - [Arquitectura](docs/KUBERNETES_ARCHITECTURE.md)
-  - [Despliegue en Kubernetes - Arquitectura](docs/KUBERNETES_ARCHITECTURE.md)
-- [Checklist de Configuración](KUBERNETES_SETUP_CHECKLIST.md)
-- [Changelog](CHANGELOG.md)
+### Frontend (Next.js)
 
-## 📝 Licencia
+| Comando | Descripcion |
+|---------|-------------|
+| `pnpm dev` | Servidor de desarrollo (port 3000) |
+| `pnpm build` | Compilar para produccion |
+| `pnpm start` | Servidor de produccion |
+| `pnpm db:push` | Aplicar schema Drizzle a la DB |
+| `pnpm db:studio` | Abrir Drizzle Studio |
+| `pnpm db:seed` | Crear usuario admin |
+| `pnpm db:migrate` | Correr migraciones Drizzle |
+| `pnpm cleanup` | Ejecutar limpieza de media |
+| `pnpm lint` | Ejecutar ESLint |
 
-Privado - Todos los derechos reservados
+### Backend (Elixir)
+
+| Comando | Descripcion |
+|---------|-------------|
+| `mix phx.server` | Iniciar servidor Phoenix (port 4000) |
+| `iex -S mix phx.server` | Servidor con shell interactivo |
+| `mix ecto.migrate` | Correr migraciones Ecto |
+| `mix ecto.rollback` | Revertir ultima migracion |
+| `mix test` | Correr tests |
+| `mix credo` | Analisis estatico de codigo |
+| `mix dialyzer` | Analisis de tipos |
+
+---
+
+## Documentacion
+
+### Arquitectura y Migracion
+
+| Documento | Descripcion |
+|-----------|-------------|
+| [Migration Overview](docs/ELIXIR_MIGRATION_OVERVIEW.md) | Comparacion de arquitectura, estrategia de migracion |
+| [Phase 1 - Sessions](docs/ELIXIR_PHASE1_SESSIONS.md) | Diseno GenServer + DynamicSupervisor |
+| [Phase 2 - Realtime](docs/ELIXIR_PHASE2_REALTIME.md) | Phoenix Channels reemplazando SSE |
+| [Phase 3 - Pipeline](docs/ELIXIR_PHASE3_PIPELINE.md) | Broadway message processing pipeline |
+| [Phase 4 - API & Jobs](docs/ELIXIR_PHASE4_API_JOBS.md) | Sender API + Oban background jobs |
+| [Phase 5 - Database](docs/ELIXIR_PHASE5_DATABASE.md) | Migracion Drizzle a Ecto |
+| [Project Structure](docs/ELIXIR_PROJECT_STRUCTURE.md) | Estructura completa y Docker |
+| [Architecture Diagrams](docs/ELIXIR_ARCHITECTURE_DIAGRAMS.md) | Diagramas ASCII de arquitectura |
+
+### Operaciones
+
+| Documento | Descripcion |
+|-----------|-------------|
+| [Admin API](docs/ADMIN_API.md) | API de administracion |
+| [Feature Requirements](docs/FEATURE_REQUIREMENTS.md) | Requerimientos de features |
+| [Kubernetes Quickstart](docs/KUBERNETES_QUICKSTART.md) | Despliegue rapido en K8s |
+| [Kubernetes Guide](docs/KUBERNETES.md) | Guia completa de Kubernetes |
+| [k3s Guide](docs/K3S.md) | Despliegue en k3s |
+| [Seeding](docs/SEEDING.md) | Guia de seeding de datos |
+
+---
+
+## Licencia
+
+Privado - Todos los derechos reservados.

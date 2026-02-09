@@ -1,0 +1,67 @@
+services:
+  # PostgreSQL database (shared with Next.js frontend)
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: wapi
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Elixir/OTP backend (WhatsApp session management, realtime, pipeline)
+  wapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: ecto://postgres:postgres@postgres:5432/wapi
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-please-change-me-in-production-this-is-a-placeholder-key-that-must-be-64-chars-long}
+      PHX_HOST: ${PHX_HOST:-localhost}
+      PORT: "4000"
+      POOL_SIZE: "20"
+      NODE_PATH: /usr/bin/node
+      BRIDGE_SCRIPT: /app/priv/baileys-bridge/index.js
+      SESSIONS_DIR: /app/data/sessions
+      MEDIA_DIR: /app/data/media
+    volumes:
+      - sessions_data:/app/data/sessions
+      - media_data:/app/data/media
+
+  # Next.js frontend (existing app)
+  frontend:
+    build:
+      context: ../
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      wapi:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/wapi
+      WAPI_URL: http://wapi:4000
+      WAPI_WS_URL: ws://wapi:4000/socket
+      NEXT_PUBLIC_WAPI_WS_URL: ${NEXT_PUBLIC_WAPI_WS_URL:-ws://localhost:4000/socket}
+
+volumes:
+  pgdata:
+  sessions_data:
+  media_data:

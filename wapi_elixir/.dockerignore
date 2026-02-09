@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Elixir build artifacts
+_build/
+deps/
+*.ez
+
+# Node.js
+priv/baileys-bridge/node_modules/
+
+# Generated on crash
+erl_crash.dump
+
+# Test and dev
+test/
+.formatter.exs
+.credo.exs
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# IDE
+.elixir_ls/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs
+docs/
+*.md

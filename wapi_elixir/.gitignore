@@ -1,0 +1,25 @@
+# Elixir
+/_build/
+/deps/
+*.ez
+*.beam
+
+# Generated on crash
+erl_crash.dump
+
+# Node.js baileys-bridge
+/priv/baileys-bridge/node_modules/
+
+# Data directories
+/data/
+
+# Dialyzer
+/priv/plts/
+
+# Environment
+.env
+
+# IDE
+.elixir_ls/
+.vscode/
+.idea/
