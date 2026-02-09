@@ -67,6 +67,22 @@ defmodule WapiWeb.SessionController do
     end
   end
 
+  def send_message(conn, %{"whatsapp_id" => whatsapp_id, "to" => to, "message" => message}) do
+    user_id = conn.assigns.user_id
+
+    unless Authorization.can_access_whatsapp?(user_id, whatsapp_id) do
+      conn |> put_status(:forbidden) |> json(%{error: "Forbidden"}) |> halt()
+    else
+      case SessionServer.send_message(whatsapp_id, to, message) do
+        {:ok, result} ->
+          json(conn, %{status: "sent", message_id: get_in(result, ["key", "id"])})
+
+        {:error, reason} ->
+          conn |> put_status(500) |> json(%{error: inspect(reason)})
+      end
+    end
+  end
+
   def list(conn, _params) do
     user_id = conn.assigns.user_id
 

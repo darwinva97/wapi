@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { connectWhatsappAction, disconnectWhatsappAction, syncConnectionStateAction } from "./actions";
 import { QRCodeSVG } from "qrcode.react";
 import { useRouter } from "next/navigation";
+import { usePhoenixChannel } from "@/hooks/usePhoenixChannel";
+import { elixirFetch } from "@/lib/elixir-client";
 
 export function ConnectButton({ id, isConnected: initialIsConnected }: { id: string, isConnected: boolean }) {
   const [loading, setLoading] = useState(false);
@@ -14,51 +15,65 @@ export function ConnectButton({ id, isConnected: initialIsConnected }: { id: str
   const [mounted, setMounted] = useState(false);
   const [isConnected, setIsConnected] = useState(initialIsConnected);
   const router = useRouter();
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Sync connection state on mount and periodically
+  // Session channel for real-time status updates (always connected)
+  const { channel: sessionChannel } = usePhoenixChannel(`session:${id}`);
+
   useEffect(() => {
-    let isMounted = true;
+    if (!sessionChannel) return;
 
-    const syncState = async () => {
-      try {
-        const result = await syncConnectionStateAction(id);
-        if (isMounted && result.isConnected !== isConnected) {
-          setIsConnected(result.isConnected);
-          if (result.wasOutOfSync) {
-            router.refresh();
-          }
-        }
-      } catch (error) {
-        console.error("Error syncing state:", error);
-      }
-    };
-
-    // Initial sync
-    syncState();
-
-    // Periodic sync every 10 seconds
-    const interval = setInterval(syncState, 10000);
+    const ref = sessionChannel.on("status_change", (payload: { status: string }) => {
+      setIsConnected(payload.status === "open");
+    });
 
     return () => {
-      isMounted = false;
-      clearInterval(interval);
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
+      sessionChannel.off("status_change", ref);
     };
-  }, [id]); // Only depend on id, not isConnected
+  }, [sessionChannel]);
+
+  // QR channel - only join when modal is open
+  const { channel: qrChannel } = usePhoenixChannel(showModal ? `qr:${id}` : null);
+
+  useEffect(() => {
+    if (!qrChannel) return;
+
+    const qrRef = qrChannel.on("qr_update", (payload: { qr: string }) => {
+      setQrCode(payload.qr);
+      setStatus("scan_qr");
+    });
+
+    const connectedRef = qrChannel.on("connected", () => {
+      setStatus("connected");
+      setTimeout(() => {
+        setShowModal(false);
+        setLoading(false);
+        router.refresh();
+      }, 1000);
+    });
+
+    const statusRef = qrChannel.on("status_change", (payload: { status: string; message?: string }) => {
+      if (payload.status === "connecting") {
+        setStatus("connecting");
+      }
+    });
+
+    return () => {
+      qrChannel.off("qr_update", qrRef);
+      qrChannel.off("connected", connectedRef);
+      qrChannel.off("status_change", statusRef);
+    };
+  }, [qrChannel, router]);
 
   async function handleConnect() {
     setLoading(true);
     setShowModal(true);
     setStatus("initializing");
     try {
-      await connectWhatsappAction(id);
+      await elixirFetch(`/api/v1/sessions/${id}/connect`, { method: "POST" });
     } catch (error) {
       console.error(error);
       alert("Error al iniciar conexión");
@@ -71,7 +86,7 @@ export function ConnectButton({ id, isConnected: initialIsConnected }: { id: str
     if (!confirm("¿Estás seguro de que quieres desconectar?")) return;
     setLoading(true);
     try {
-      await disconnectWhatsappAction(id);
+      await elixirFetch(`/api/v1/sessions/${id}/disconnect`, { method: "POST" });
       router.refresh();
     } catch (error) {
       console.error(error);
@@ -80,39 +95,6 @@ export function ConnectButton({ id, isConnected: initialIsConnected }: { id: str
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    if (!showModal) return;
-
-    const eventSource = new EventSource(`/api/whatsapp/${id}/qr`);
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "qr") {
-        setQrCode(data.qr);
-        setStatus("scan_qr");
-      } else if (data.type === "status") {
-        if (data.status === "open") {
-          setStatus("connected");
-          eventSource.close();
-          setTimeout(() => {
-            setShowModal(false);
-            router.refresh();
-          }, 1000);
-        } else if (data.status === "connecting") {
-          setStatus("connecting");
-        }
-      }
-    };
-
-    eventSource.onerror = (err) => {
-      console.error("SSE Error:", err);
-    };
-
-    return () => {
-      eventSource.close();
-    };
-  }, [showModal, id, router]);
 
   const modalContent = showModal ? (
     <div className="fixed inset-0 z-9999 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -131,7 +113,7 @@ export function ConnectButton({ id, isConnected: initialIsConnected }: { id: str
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-          
+
           <div>
             <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
               <svg className="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">

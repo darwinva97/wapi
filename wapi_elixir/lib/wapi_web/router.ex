@@ -22,6 +22,7 @@ defmodule WapiWeb.Router do
     post "/sessions/:whatsapp_id/connect", SessionController, :connect
     post "/sessions/:whatsapp_id/disconnect", SessionController, :disconnect
     post "/sessions/:whatsapp_id/reset", SessionController, :reset
+    post "/sessions/:whatsapp_id/send", SessionController, :send_message
     get "/sessions/:whatsapp_id/status", SessionController, :status
     get "/sessions", SessionController, :list
   end

@@ -195,6 +195,7 @@ export default async function ChatPage({
         initialMessages={messages}
         chatId={decodedChatId}
         slug={slug}
+        whatsappId={whatsapp.id}
         senderNames={Object.fromEntries(senderMap)}
         isGroup={decodedChatId.includes('@g.us')}
       />

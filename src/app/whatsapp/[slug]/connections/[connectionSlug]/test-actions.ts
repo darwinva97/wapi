@@ -5,7 +5,8 @@ import { db } from "@/db";
 import { whatsappTable, connectionTable } from "@/db/schema";
 import { headers } from "next/headers";
 import { eq, and } from "drizzle-orm";
-import { getSocket } from "@/lib/whatsapp";
+import { ELIXIR_API_URL } from "@/config/elixir";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 export async function testSenderAction(connectionId: string, to: string, message: string) {
@@ -43,20 +44,25 @@ export async function testSenderAction(connectionId: string, to: string, message
     return { success: false, error: "Sender is disabled" };
   }
 
-  const sock = getSocket(wa.id);
-  if (!sock) {
-    if (wa.connected) {
-      await db.update(whatsappTable)
-        .set({ connected: false })
-        .where(eq(whatsappTable.id, wa.id));
-      revalidatePath(`/whatsapp/${wa.slug}`, 'layout');
-    }
-    return { success: false, error: "WhatsApp is not connected" };
-  }
-
   try {
     const jid = to.includes("@") ? to : `${to}@s.whatsapp.net`;
-    await sock.sendMessage(jid, { text: message });
+    const cookieStore = await cookies();
+    const authToken = cookieStore.get("better-auth.session_token")?.value;
+
+    const response = await fetch(`${ELIXIR_API_URL}/api/v1/sessions/${wa.id}/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+      },
+      body: JSON.stringify({ to: jid, message: { text: message } }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, error: error.error || "Failed to send message" };
+    }
+
     return { success: true, message: "Message sent successfully" };
   } catch (error: unknown) {
     console.error("Test Sender Error:", error);

@@ -105,7 +105,7 @@ export default async function ChatPage({
       </div>
 
       {/* Scrollable Messages */}
-      <ChatMessages initialMessages={typedMessages} chatId={decodedChatId} />
+      <ChatMessages initialMessages={typedMessages} chatId={decodedChatId} whatsappId={whatsapp.id} />
 
       {/* Sticky Input at Bottom */}
       <div className="shrink-0 sticky bottom-0 bg-background">

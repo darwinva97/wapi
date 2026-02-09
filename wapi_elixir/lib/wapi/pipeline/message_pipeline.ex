@@ -130,10 +130,10 @@ defmodule Wapi.Pipeline.MessagePipeline do
                 id: msg.message_id,
                 body: msg.body,
                 timestamp: msg.timestamp,
-                from_me: msg.from_me,
-                sender_id: msg.sender_id,
-                message_type: msg.message_type,
-                ack_status: if(msg.from_me, do: 1, else: 2)
+                fromMe: msg.from_me,
+                senderId: msg.sender_id,
+                messageType: msg.message_type,
+                ackStatus: if(msg.from_me, do: 1, else: 2)
               }
             })
           end
@@ -200,7 +200,7 @@ defmodule Wapi.Pipeline.MessagePipeline do
           Phoenix.PubSub.broadcast(Wapi.PubSub, "chat:#{chat_id}", %{
             event: "message_ack",
             payload: %{
-              message_id: message_id,
+              id: message_id,
               chat_id: chat_id,
               ack_status: new_ack
             }

@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { AudioPlayer } from "./audio-player";
 import { VideoPlayer } from "./video-player";
+import { usePhoenixChannel } from "@/hooks/usePhoenixChannel";
 
 interface Message {
   id: string;
@@ -17,12 +18,12 @@ interface Message {
   mediaMetadata?: Record<string, unknown>;
   ackStatus?: number;
   fileName?: string | null;
-  isAckUpdate?: boolean;
 }
 
 interface ChatMessagesProps {
   initialMessages: Message[];
   chatId: string;
+  whatsappId: string;
 }
 
 // URL regex pattern
@@ -55,7 +56,7 @@ function renderTextWithLinks(text: string, fromMe: boolean) {
   });
 }
 
-export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
+export function ChatMessages({ initialMessages, chatId, whatsappId }: ChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -75,52 +76,34 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const { channel } = usePhoenixChannel("chat:" + chatId, { whatsapp_id: whatsappId });
+
   useEffect(() => {
-    console.log("Connecting to SSE for chat:", chatId);
-    const eventSource = new EventSource(`/api/sse/chat/${encodeURIComponent(chatId)}`);
+    if (!channel) return;
 
-    eventSource.onopen = () => {
-      console.log("SSE Connected");
-    };
-
-    eventSource.onmessage = (event) => {
-      console.log("SSE Message received:", event.data);
-      try {
-        const newMessage = JSON.parse(event.data);
-        // Convert timestamp string back to Date object
-        if (newMessage.timestamp) {
-          newMessage.timestamp = new Date(newMessage.timestamp);
-        }
-        
-        setMessages((prev) => {
-          // Handle ack updates
-          if (newMessage.isAckUpdate) {
-            return prev.map(m => 
-              m.id === newMessage.id 
-                ? { ...m, ackStatus: newMessage.ackStatus }
-                : m
-            );
-          }
-          
-          // Avoid duplicates for new messages
-          if (prev.some(m => m.id === newMessage.id)) return prev;
-          return [...prev, newMessage];
-        });
-      } catch (e) {
-        console.error("Error parsing SSE message:", e);
+    const newMsgRef = channel.on("new_message", (msg: Message) => {
+      if (msg.timestamp) {
+        msg.timestamp = new Date(msg.timestamp);
       }
-    };
+      setMessages((prev) => {
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    });
 
-    eventSource.onerror = (err) => {
-      console.error("SSE Error:", err);
-      eventSource.close();
-    };
+    const ackRef = channel.on("message_ack", (payload: { id: string; ack_status: number }) => {
+      setMessages((prev) =>
+        prev.map(m =>
+          m.id === payload.id ? { ...m, ackStatus: payload.ack_status } : m
+        )
+      );
+    });
 
     return () => {
-      console.log("Closing SSE connection");
-      eventSource.close();
+      channel.off("new_message", newMsgRef);
+      channel.off("message_ack", ackRef);
     };
-  }, [chatId]);
+  }, [channel]);
 
   return (
     <ScrollArea className="flex-1 min-h-0 overflow-auto" ref={scrollRef}>
@@ -222,7 +205,7 @@ export function ChatMessages({ initialMessages, chatId }: ChatMessagesProps) {
                   <span className="italic opacity-50">Media/System Message</span>
                 )
               )}
-              
+
               {/* Timestamp and Delivery Status */}
               <div className="flex items-center gap-1 text-[10px] opacity-70 self-end">
                 <span suppressHydrationWarning>

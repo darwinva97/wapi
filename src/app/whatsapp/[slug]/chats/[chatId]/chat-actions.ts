@@ -3,9 +3,17 @@
 import { db } from "@/db";
 import { reactionTable } from "@/db/schema";
 import { getWhatsappBySlugWithRole } from "@/lib/auth-utils";
-import { getSocket } from "@/lib/whatsapp";
+import { ELIXIR_API_URL } from "@/config/elixir";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
+
+async function getAuthToken(): Promise<string> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("better-auth.session_token")?.value;
+  if (!token) throw new Error("Not authenticated");
+  return token;
+}
 
 export async function sendReactionAction(
   slug: string,
@@ -14,25 +22,27 @@ export async function sendReactionAction(
   emoji: string
 ) {
   const { wa } = await getWhatsappBySlugWithRole(slug, "agent");
+  const token = await getAuthToken();
 
-  const sock = getSocket(wa.id);
+  // Send reaction via Elixir
+  const response = await fetch(`${ELIXIR_API_URL}/api/v1/sessions/${wa.id}/send`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      to: chatId,
+      message: { react: { text: emoji, key: { remoteJid: chatId, id: messageId, fromMe: false } } },
+    }),
+  });
 
-  if (!sock) {
-    throw new Error("WhatsApp is not connected");
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to send reaction");
   }
 
-  const senderId = sock.user?.id || "";
-
-  await sock.sendMessage(chatId, {
-    react: {
-      text: emoji,
-      key: {
-        remoteJid: chatId,
-        id: messageId,
-        fromMe: false,
-      },
-    },
-  });
+  const senderId = wa.id;
 
   // Save reaction to database
   if (emoji === "") {

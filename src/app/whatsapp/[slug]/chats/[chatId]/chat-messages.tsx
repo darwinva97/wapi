@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { sendReactionAction } from "./chat-actions";
+import { usePhoenixChannel } from "@/hooks/usePhoenixChannel";
 
 interface Reaction {
   id: string;
@@ -39,6 +40,7 @@ interface ChatMessagesProps {
   initialMessages: Message[];
   chatId: string;
   slug: string;
+  whatsappId: string;
   senderNames?: Record<string, string>;
   isGroup?: boolean;
 }
@@ -77,7 +79,7 @@ function renderTextWithLinks(text: string, fromMe: boolean) {
   });
 }
 
-export function ChatMessages({ initialMessages, chatId, slug, senderNames = {}, isGroup = false }: ChatMessagesProps) {
+export function ChatMessages({ initialMessages, chatId, slug, whatsappId, senderNames = {}, isGroup = false }: ChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -98,7 +100,7 @@ export function ChatMessages({ initialMessages, chatId, slug, senderNames = {}, 
   // Sync state with initialMessages when they change
   useEffect(() => {
     // Merge: prefer initialMessages data for existing messages (has reactions),
-    // but keep SSE messages that aren't in initialMessages yet
+    // but keep channel messages that aren't in initialMessages yet
     const merged: Message[] = [];
     const seenIds = new Set<string>();
 
@@ -108,7 +110,7 @@ export function ChatMessages({ initialMessages, chatId, slug, senderNames = {}, 
       seenIds.add(msg.id);
     }
 
-    // Then add any SSE messages that aren't in initialMessages yet
+    // Then add any real-time messages that aren't in initialMessages yet
     for (const msg of messages) {
       if (!seenIds.has(msg.id)) {
         merged.push(msg);
@@ -131,52 +133,34 @@ export function ChatMessages({ initialMessages, chatId, slug, senderNames = {}, 
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const { channel } = usePhoenixChannel("chat:" + chatId, { whatsapp_id: whatsappId });
+
   useEffect(() => {
-    console.log("Connecting to SSE for chat:", chatId);
-    const eventSource = new EventSource(`/api/sse/chat/${encodeURIComponent(chatId)}`);
+    if (!channel) return;
 
-    eventSource.onopen = () => {
-      console.log("SSE Connected");
-    };
-
-    eventSource.onmessage = (event) => {
-      console.log("SSE Message received:", event.data);
-      try {
-        const newMessage = JSON.parse(event.data);
-        // Convert timestamp string back to Date object
-        if (newMessage.timestamp) {
-          newMessage.timestamp = new Date(newMessage.timestamp);
-        }
-        
-        setMessages((prev) => {
-          // Handle ack updates
-          if (newMessage.isAckUpdate) {
-            return prev.map(m => 
-              m.id === newMessage.id 
-                ? { ...m, ackStatus: newMessage.ackStatus }
-                : m
-            );
-          }
-          
-          // Avoid duplicates for new messages
-          if (prev.some(m => m.id === newMessage.id)) return prev;
-          return [...prev, newMessage];
-        });
-      } catch (e) {
-        console.error("Error parsing SSE message:", e);
+    const newMsgRef = channel.on("new_message", (msg: Message) => {
+      if (msg.timestamp) {
+        msg.timestamp = new Date(msg.timestamp);
       }
-    };
+      setMessages((prev) => {
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    });
 
-    eventSource.onerror = (err) => {
-      console.error("SSE Error:", err);
-      eventSource.close();
-    };
+    const ackRef = channel.on("message_ack", (payload: { id: string; ack_status: number }) => {
+      setMessages((prev) =>
+        prev.map(m =>
+          m.id === payload.id ? { ...m, ackStatus: payload.ack_status } : m
+        )
+      );
+    });
 
     return () => {
-      console.log("Closing SSE connection");
-      eventSource.close();
+      channel.off("new_message", newMsgRef);
+      channel.off("message_ack", ackRef);
     };
-  }, [chatId]);
+  }, [channel]);
 
   return (
     <ScrollArea className="flex-1 min-h-0 overflow-auto" ref={scrollRef}>

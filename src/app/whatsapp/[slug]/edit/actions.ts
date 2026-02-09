@@ -6,9 +6,8 @@ import { eq, and, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getWhatsappWithRole, requireInstancePermission } from "@/lib/auth-utils";
-import { disconnectWhatsApp } from "@/lib/whatsapp";
-import fs from "fs";
-import path from "path";
+import { ELIXIR_API_URL } from "@/config/elixir";
+import { cookies } from "next/headers";
 
 export async function updateWhatsappAction(id: string, formData: FormData) {
   // Require manager role to edit WhatsApp settings
@@ -44,8 +43,6 @@ export async function updateWhatsappAction(id: string, formData: FormData) {
   redirect(`/whatsapp/${slug}`);
 }
 
-const SESSIONS_DIR = "whatsapp_sessions";
-
 export async function deleteWhatsappAction(slug: string) {
   // Get the instance and verify owner permission
   const wa = await db.query.whatsappTable.findFirst({
@@ -59,13 +56,20 @@ export async function deleteWhatsappAction(slug: string) {
   // Require delete_instance permission (only owners have this)
   await requireInstancePermission(wa.id, "delete_instance");
 
-  // Disconnect the WhatsApp session if active
-  await disconnectWhatsApp(wa.id);
+  // Disconnect the WhatsApp session via Elixir backend
+  try {
+    const cookieStore = await cookies();
+    const authToken = cookieStore.get("better-auth.session_token")?.value;
 
-  // Delete session files from disk
-  const sessionPath = path.join(SESSIONS_DIR, wa.id);
-  if (fs.existsSync(sessionPath)) {
-    fs.rmSync(sessionPath, { recursive: true, force: true });
+    await fetch(`${ELIXIR_API_URL}/api/v1/sessions/${wa.id}/disconnect`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+      },
+    });
+  } catch {
+    // Ignore disconnect errors during deletion
   }
 
   // Delete all members first (to avoid FK constraint issues)

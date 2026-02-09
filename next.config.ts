@@ -4,11 +4,8 @@ import path from "path";
 const nextConfig: NextConfig = {
   reactCompiler: true,
   cacheComponents: true,
+  transpilePackages: ['phoenix'],
   serverExternalPackages: ['baileys', 'pino', 'thread-stream'],
-  output: 'standalone',
-  experimental: {
-    turbopackFileSystemCacheForDev: true,
-  },
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {
