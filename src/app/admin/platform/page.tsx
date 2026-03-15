@@ -50,23 +50,27 @@ export default function PlatformConfigPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-500/10 text-orange-500">
           <Settings className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Configuración de Plataforma</h1>
-          <p className="text-muted-foreground">
+          <h1 className="font-mono text-2xl font-bold tracking-tight">
+            Configuración de Plataforma
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Ajustes globales que afectan a todos los usuarios
           </p>
         </div>
       </div>
 
+      {/* Form */}
       <form action={formAction}>
         <Card>
           <CardHeader>
-            <CardTitle>Registro y Permisos</CardTitle>
+            <CardTitle className="font-mono">Registro y Permisos</CardTitle>
             <CardDescription>
               Configura quién puede registrarse y qué pueden hacer los usuarios
             </CardDescription>
@@ -147,7 +151,11 @@ export default function PlatformConfigPage() {
             )}
 
             <div className="flex justify-end pt-4">
-              <Button type="submit" disabled={isPending}>
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="rounded-full"
+              >
                 {isPending ? (
                   <>
                     <Spinner className="mr-2 h-4 w-4" />

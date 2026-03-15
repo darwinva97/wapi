@@ -6,7 +6,7 @@ import { notFound, redirect } from "next/navigation";
 import { eq, and } from "drizzle-orm";
 import { TestConnection } from "./test-connection";
 import { Suspense } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
 async function ConnectionDetailView({
@@ -49,22 +49,21 @@ async function ConnectionDetailView({
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Detalles de la Conexión</CardTitle>
-          <CardDescription>Configuración y credenciales.</CardDescription>
+          <CardTitle className="font-mono">Detalles de la Conexión</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <div className="text-sm font-medium">Nombre</div>
-              <div className="mt-1 text-sm">{connection.name}</div>
+              <div className="text-sm text-muted-foreground">Nombre</div>
+              <div className="mt-1 text-sm font-medium">{connection.name}</div>
             </div>
             <div>
-              <div className="text-sm font-medium">Slug</div>
-              <div className="mt-1 text-sm">{connection.slug}</div>
+              <div className="text-sm text-muted-foreground">Slug</div>
+              <div className="mt-1 text-sm font-medium">{connection.slug}</div>
             </div>
             <div>
-              <div className="text-sm font-medium">Descripción</div>
-              <div className="mt-1 text-sm">{connection.description || '-'}</div>
+              <div className="text-sm text-muted-foreground">Descripción</div>
+              <div className="mt-1 text-sm font-medium">{connection.description || '-'}</div>
             </div>
           </div>
 
@@ -72,8 +71,8 @@ async function ConnectionDetailView({
             <>
               <Separator />
               <div>
-                <div className="text-sm font-medium">Sender Token</div>
-                <div className="mt-1 text-sm font-mono bg-muted p-2 rounded break-all">
+                <div className="text-sm text-muted-foreground">Sender Token</div>
+                <div className="mt-1 text-sm font-mono bg-muted rounded-lg p-3 break-all">
                   {connection.senderToken}
                 </div>
               </div>
@@ -85,14 +84,14 @@ async function ConnectionDetailView({
               <Separator />
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <div className="text-sm font-medium">Receiver Request Config</div>
-                  <pre className="mt-1 text-xs font-mono bg-muted p-2 rounded whitespace-pre-wrap">
+                  <div className="text-sm text-muted-foreground">Receiver Request Config</div>
+                  <pre className="mt-1 text-xs font-mono bg-muted rounded-lg p-3 whitespace-pre-wrap">
                     {connection.receiverRequest ? JSON.stringify(connection.receiverRequest, null, 2) : 'No configurado'}
                   </pre>
                 </div>
                 <div>
-                  <div className="text-sm font-medium">Receiver Filter</div>
-                  <pre className="mt-1 text-xs font-mono bg-muted p-2 rounded whitespace-pre-wrap">
+                  <div className="text-sm text-muted-foreground">Receiver Filter</div>
+                  <pre className="mt-1 text-xs font-mono bg-muted rounded-lg p-3 whitespace-pre-wrap">
                     {connection.receiverFilter ? JSON.stringify(connection.receiverFilter, null, 2) : 'No configurado'}
                   </pre>
                 </div>
@@ -102,8 +101,8 @@ async function ConnectionDetailView({
         </CardContent>
       </Card>
 
-      <TestConnection 
-        connection={connection} 
+      <TestConnection
+        connection={connection}
         whatsappSlug={slug}
         connectionSlug={connectionSlug}
       />

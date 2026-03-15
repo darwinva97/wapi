@@ -32,45 +32,47 @@ export default async function ContactsPage({ params }: { params: Promise<{ slug:
   });
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Contactos ({contacts.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Push Name</TableHead>
-                <TableHead>Teléfono / LID</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contacts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground">
-                    No hay contactos.
-                  </TableCell>
+    <div className="flex-1 overflow-auto">
+      <div className="p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-mono">Contactos ({contacts.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Push Name</TableHead>
+                  <TableHead>Telefono / LID</TableHead>
                 </TableRow>
-              ) : (
-                contacts.map((contact) => (
-                  <TableRow key={contact.id}>
-                    <TableCell>{contact.name}</TableCell>
-                    <TableCell>{contact.pushName}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span>{contact.pn}</span>
-                        <span className="text-xs text-muted-foreground">{contact.lid}</span>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {contacts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                      No hay contactos.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                ) : (
+                  contacts.map((contact) => (
+                    <TableRow key={contact.id}>
+                      <TableCell className="font-medium">{contact.name}</TableCell>
+                      <TableCell>{contact.pushName}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span>{contact.pn}</span>
+                          <span className="text-xs text-muted-foreground">{contact.lid}</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

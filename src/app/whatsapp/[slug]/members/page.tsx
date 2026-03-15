@@ -197,267 +197,265 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <UserPlus className="h-6 w-6" />
+    <div className="flex-1 overflow-auto">
+      <div className="p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold tracking-tight font-mono">Miembros</h1>
+            <Badge variant="secondary" className="rounded-full">
+              {members.length}
+            </Badge>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">Miembros</h1>
-            <p className="text-muted-foreground">
-              {members.length} miembro{members.length !== 1 ? "s" : ""} en esta
-              instancia
-            </p>
-          </div>
+
+          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="rounded-full">
+                <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                Agregar miembro
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Agregar nuevo miembro</DialogTitle>
+                <DialogDescription>
+                  Invita a un usuario a esta instancia de WhatsApp
+                </DialogDescription>
+              </DialogHeader>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleAddMember(new FormData(e.currentTarget));
+                }}
+              >
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email del usuario</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="usuario@ejemplo.com"
+                      required
+                      disabled={addLoading}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      El usuario debe estar registrado en la plataforma
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Rol</Label>
+                    <Select name="role" defaultValue="agent">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un rol" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="agent">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-green-500" />
+                            <span>Agente</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="manager">
+                          <div className="flex items-center gap-2">
+                            <Shield className="h-4 w-4 text-blue-500" />
+                            <span>Manager</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="owner">
+                          <div className="flex items-center gap-2">
+                            <Crown className="h-4 w-4 text-amber-500" />
+                            <span>Propietario</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {addError && (
+                    <Alert variant="destructive" className="py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{addError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline" className="rounded-full" disabled={addLoading}>
+                      Cancelar
+                    </Button>
+                  </DialogClose>
+                  <Button type="submit" className="rounded-full" disabled={addLoading}>
+                    {addLoading ? (
+                      <>
+                        <Spinner className="mr-2 h-4 w-4" />
+                        Agregando...
+                      </>
+                    ) : (
+                      "Agregar"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Agregar miembro
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Agregar nuevo miembro</DialogTitle>
-              <DialogDescription>
-                Invita a un usuario a esta instancia de WhatsApp
-              </DialogDescription>
-            </DialogHeader>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleAddMember(new FormData(e.currentTarget));
-              }}
-            >
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email del usuario</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="usuario@ejemplo.com"
-                    required
-                    disabled={addLoading}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    El usuario debe estar registrado en la plataforma
+        {/* Members List Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-mono text-base">Equipo</CardTitle>
+            <CardDescription>
+              Usuarios con acceso a esta instancia de WhatsApp
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y">
+              {members.map((member) => {
+                const RoleIcon =
+                  roleIcons[member.role as keyof typeof roleIcons] || User;
+                const roleLabel =
+                  roleLabels[member.role as keyof typeof roleLabels] ||
+                  member.role;
+                const roleColor =
+                  roleColors[member.role as keyof typeof roleColors] ||
+                  "text-muted-foreground bg-muted";
+
+                return (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between py-4 first:pt-0 last:pb-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-full ${roleColor}`}
+                      >
+                        <RoleIcon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{member.user.name}</span>
+                          <Badge variant="outline" className="rounded-full text-xs">
+                            {roleLabel}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {member.user.email}
+                        </p>
+                      </div>
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleUpdateRole(member.id, "agent")}
+                          disabled={member.role === "agent"}
+                        >
+                          <User className="mr-2 h-4 w-4 text-green-500" />
+                          Cambiar a Agente
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleUpdateRole(member.id, "manager")}
+                          disabled={member.role === "manager"}
+                        >
+                          <Shield className="mr-2 h-4 w-4 text-blue-500" />
+                          Cambiar a Manager
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleUpdateRole(member.id, "owner")}
+                          disabled={member.role === "owner"}
+                        >
+                          <Crown className="mr-2 h-4 w-4 text-amber-500" />
+                          Cambiar a Propietario
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem
+                              onSelect={(e) => e.preventDefault()}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Eliminar miembro?
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                {member.user.name} perdera acceso a esta instancia
+                                de WhatsApp. Esta accion no se puede deshacer.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="rounded-full">Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleRemoveMember(member.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full"
+                              >
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Role Descriptions Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-mono text-base">Descripcion de roles</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 text-sm">
+              <div className="flex gap-3">
+                <Crown className="h-5 w-5 text-amber-500 shrink-0" />
+                <div>
+                  <p className="font-medium">Propietario</p>
+                  <p className="text-muted-foreground">
+                    Control total. Puede agregar/eliminar cualquier rol, eliminar
+                    la instancia, y gestionar todas las configuraciones.
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role">Rol</Label>
-                  <Select name="role" defaultValue="agent">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un rol" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="agent">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-green-500" />
-                          <span>Agente</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="manager">
-                        <div className="flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-blue-500" />
-                          <span>Manager</span>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="owner">
-                        <div className="flex items-center gap-2">
-                          <Crown className="h-4 w-4 text-amber-500" />
-                          <span>Propietario</span>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {addError && (
-                  <Alert variant="destructive" className="py-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{addError}</AlertDescription>
-                  </Alert>
-                )}
               </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={addLoading}>
-                    Cancelar
-                  </Button>
-                </DialogClose>
-                <Button type="submit" disabled={addLoading}>
-                  {addLoading ? (
-                    <>
-                      <Spinner className="mr-2 h-4 w-4" />
-                      Agregando...
-                    </>
-                  ) : (
-                    "Agregar"
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+              <div className="flex gap-3">
+                <Shield className="h-5 w-5 text-blue-500 shrink-0" />
+                <div>
+                  <p className="font-medium">Manager</p>
+                  <p className="text-muted-foreground">
+                    Gestion avanzada. Puede agregar managers y agentes, gestionar
+                    conexiones y configuracion, pero no puede eliminar
+                    propietarios.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <User className="h-5 w-5 text-green-500 shrink-0" />
+                <div>
+                  <p className="font-medium">Agente</p>
+                  <p className="text-muted-foreground">
+                    Operador de chat. Puede enviar y recibir mensajes, ver chats,
+                    y configurar retencion de archivos dentro del limite
+                    permitido.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Equipo</CardTitle>
-          <CardDescription>
-            Usuarios con acceso a esta instancia de WhatsApp
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="divide-y">
-            {members.map((member) => {
-              const RoleIcon =
-                roleIcons[member.role as keyof typeof roleIcons] || User;
-              const roleLabel =
-                roleLabels[member.role as keyof typeof roleLabels] ||
-                member.role;
-              const roleColor =
-                roleColors[member.role as keyof typeof roleColors] ||
-                "text-muted-foreground bg-muted";
-
-              return (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between py-4 first:pt-0 last:pb-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full ${roleColor}`}
-                    >
-                      <RoleIcon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{member.user.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {roleLabel}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {member.user.email}
-                      </p>
-                    </div>
-                  </div>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleUpdateRole(member.id, "agent")}
-                        disabled={member.role === "agent"}
-                      >
-                        <User className="mr-2 h-4 w-4 text-green-500" />
-                        Cambiar a Agente
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleUpdateRole(member.id, "manager")}
-                        disabled={member.role === "manager"}
-                      >
-                        <Shield className="mr-2 h-4 w-4 text-blue-500" />
-                        Cambiar a Manager
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleUpdateRole(member.id, "owner")}
-                        disabled={member.role === "owner"}
-                      >
-                        <Crown className="mr-2 h-4 w-4 text-amber-500" />
-                        Cambiar a Propietario
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <DropdownMenuItem
-                            onSelect={(e) => e.preventDefault()}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Eliminar
-                          </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              ¿Eliminar miembro?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {member.user.name} perderá acceso a esta instancia
-                              de WhatsApp. Esta acción no se puede deshacer.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleRemoveMember(member.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Role descriptions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Descripción de roles</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4 text-sm">
-            <div className="flex gap-3">
-              <Crown className="h-5 w-5 text-amber-500 shrink-0" />
-              <div>
-                <p className="font-medium">Propietario</p>
-                <p className="text-muted-foreground">
-                  Control total. Puede agregar/eliminar cualquier rol, eliminar
-                  la instancia, y gestionar todas las configuraciones.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <Shield className="h-5 w-5 text-blue-500 shrink-0" />
-              <div>
-                <p className="font-medium">Manager</p>
-                <p className="text-muted-foreground">
-                  Gestión avanzada. Puede agregar managers y agentes, gestionar
-                  conexiones y configuración, pero no puede eliminar
-                  propietarios.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <User className="h-5 w-5 text-green-500 shrink-0" />
-              <div>
-                <p className="font-medium">Agente</p>
-                <p className="text-muted-foreground">
-                  Operador de chat. Puede enviar y recibir mensajes, ver chats,
-                  y configurar retención de archivos dentro del límite
-                  permitido.
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

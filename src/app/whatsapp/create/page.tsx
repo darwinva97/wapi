@@ -11,6 +11,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -32,9 +33,9 @@ export default function CreateWhatsappPage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl items-center px-4 py-4 sm:px-6 lg:px-8">
-          <Button variant="ghost" size="sm" asChild>
+      <header className="sticky top-0 z-50 h-16 border-b bg-card">
+        <div className="mx-auto flex h-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+          <Button variant="ghost" size="sm" className="rounded-full" asChild>
             <Link href="/" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               Volver
@@ -43,16 +44,19 @@ export default function CreateWhatsappPage() {
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-2xl items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-        <div className="w-full space-y-8">
-          {/* Header Section */}
-          <div className="flex flex-col items-center text-center space-y-2">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+      {/* Main Content */}
+      <main className="mx-auto max-w-xl px-4 py-12">
+        <div className="space-y-8">
+          {/* Icon Header */}
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-500">
               <MessageCircle className="h-8 w-8" strokeWidth={2} />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Conectar nuevo WhatsApp</h1>
-              <p className="text-muted-foreground">
+            <div className="space-y-2">
+              <h1 className="font-mono text-2xl font-semibold text-center">
+                Conectar nuevo WhatsApp
+              </h1>
+              <p className="text-muted-foreground text-center">
                 Ingresa los detalles de la cuenta que deseas conectar
               </p>
             </div>
@@ -61,13 +65,13 @@ export default function CreateWhatsappPage() {
           {/* Form Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Información de la cuenta</CardTitle>
+              <CardTitle>Informacion de la cuenta</CardTitle>
               <CardDescription>
-                Configura los datos básicos de tu cuenta de WhatsApp
+                Configura los datos basicos de tu cuenta de WhatsApp
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form action={formAction} className="space-y-5">
+            <form action={formAction}>
+              <CardContent className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nombre de la cuenta</Label>
                   <Input
@@ -82,7 +86,10 @@ export default function CreateWhatsappPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="slug">
-                    Slug <span className="text-muted-foreground">(Identificador único)</span>
+                    Slug{" "}
+                    <span className="text-muted-foreground">
+                      (Identificador unico)
+                    </span>
                   </Label>
                   <Input
                     id="slug"
@@ -93,12 +100,13 @@ export default function CreateWhatsappPage() {
                     disabled={isPending}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Identificador único para la API (solo letras minúsculas, números y guiones)
+                    Identificador unico para la API (solo letras minusculas,
+                    numeros y guiones)
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Número de teléfono</Label>
+                  <Label htmlFor="phoneNumber">Numero de telefono</Label>
                   <Input
                     id="phoneNumber"
                     name="phoneNumber"
@@ -111,13 +119,14 @@ export default function CreateWhatsappPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="description">
-                    Descripción <span className="text-muted-foreground">(Opcional)</span>
+                    Descripcion{" "}
+                    <span className="text-muted-foreground">(Opcional)</span>
                   </Label>
                   <Textarea
                     id="description"
                     name="description"
                     rows={3}
-                    placeholder="Para qué se usará esta cuenta..."
+                    placeholder="Para que se usara esta cuenta..."
                     disabled={isPending}
                   />
                 </div>
@@ -125,36 +134,41 @@ export default function CreateWhatsappPage() {
                 {state.error && (
                   <Alert variant="destructive" className="py-3">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="text-sm">{state.error}</AlertDescription>
+                    <AlertDescription className="text-sm">
+                      {state.error}
+                    </AlertDescription>
                   </Alert>
                 )}
-
-                <div className="flex items-center justify-between gap-4 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    asChild
-                    disabled={isPending}
-                  >
-                    <Link href="/">Cancelar</Link>
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={isPending}>
-                    {isPending ? (
-                      <>
-                        <SpinnerComponent className="mr-2" />
-                        Guardando...
-                      </>
-                    ) : (
-                      "Guardar y Conectar"
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
+              </CardContent>
+              <CardFooter className="flex items-center justify-between gap-4 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 rounded-full"
+                  asChild
+                  disabled={isPending}
+                >
+                  <Link href="/">Cancelar</Link>
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 rounded-full"
+                  disabled={isPending}
+                >
+                  {isPending ? (
+                    <>
+                      <SpinnerComponent className="mr-2" />
+                      Guardando...
+                    </>
+                  ) : (
+                    "Guardar y Conectar"
+                  )}
+                </Button>
+              </CardFooter>
+            </form>
           </Card>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

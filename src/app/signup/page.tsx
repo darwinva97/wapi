@@ -6,16 +6,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
-import { AlertCircle, MessageCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { checkRegistrationAllowed } from "./actions";
 
 export default function SignupPage() {
@@ -85,130 +78,143 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-muted/80 via-background to-muted/80 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-6">
-        {/* Logo/Brand */}
-        <div className="flex flex-col items-center space-y-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
-            <MessageCircle className="h-7 w-7" strokeWidth={2} />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">WAPI</h1>
-          <p className="text-sm text-muted-foreground">WhatsApp API Gateway</p>
-        </div>
-
-        <Card className="shadow-lg border-border/50">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl font-semibold">Crear cuenta</CardTitle>
-            <CardDescription>
-              Ingresa tus datos para registrarte
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={handleSignup}>
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-medium">
-                  Nombre
-                </Label>
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  autoComplete="name"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Tu nombre"
-                  disabled={loading}
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@email.com"
-                  disabled={loading}
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  Contraseña
-                </Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  disabled={loading}
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-sm font-medium">
-                  Confirmar contraseña
-                </Label>
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  disabled={loading}
-                  className="h-10"
-                />
-              </div>
-
-              {error && (
-                <Alert variant="destructive" className="py-3">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-sm">{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full h-10 mt-2 shadow-sm"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Spinner className="mr-2" />
-                    Creando cuenta...
-                  </>
-                ) : (
-                  "Crear cuenta"
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-4 text-center text-sm">
-              <span className="text-muted-foreground">¿Ya tienes cuenta? </span>
-              <Link href="/login" className="text-primary hover:underline">
-                Iniciar sesión
-              </Link>
+    <main className="flex min-h-screen">
+      {/* Left Panel - Orange Gradient */}
+      <div className="hidden lg:flex w-[45%] bg-gradient-to-b from-[#FF8400] to-[#CC6A00] flex-col items-center justify-center px-12">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white">
+              <span className="text-xl font-bold text-[#FF8400]">W</span>
             </div>
-          </CardContent>
-        </Card>
+            <span className="text-3xl font-mono font-bold text-white">WAPI</span>
+          </div>
+          <p className="text-white/80 text-sm">WhatsApp API Gateway</p>
+          <p className="text-white/60 text-sm text-center max-w-[280px] mt-2">
+            Crea tu cuenta y empieza a conectar tus WhatsApps en minutos.
+          </p>
+        </div>
+      </div>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Al registrarte, aceptas nuestros términos y condiciones
-        </p>
+      {/* Right Panel - Form */}
+      <div className="flex-1 flex items-center justify-center bg-background px-6 py-12">
+        <div className="w-full max-w-[400px] space-y-6">
+          {/* Mobile Logo (visible only on small screens) */}
+          <div className="flex lg:hidden flex-col items-center space-y-2 mb-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FF8400]">
+                <span className="text-lg font-bold text-white">W</span>
+              </div>
+              <span className="text-2xl font-mono font-bold">WAPI</span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="font-mono text-2xl font-semibold">Crear cuenta</h1>
+            <p className="text-sm text-muted-foreground">
+              Ingresa tus datos para registrarte
+            </p>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleSignup}>
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-sm font-medium">
+                Nombre
+              </Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Tu nombre"
+                disabled={loading}
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@email.com"
+                disabled={loading}
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium">
+                Contraseña
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                disabled={loading}
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-sm font-medium">
+                Confirmar contraseña
+              </Label>
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                disabled={loading}
+                className="h-10"
+              />
+            </div>
+
+            {error && (
+              <Alert variant="destructive" className="py-3">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm">{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full h-10 mt-2 rounded-full"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Spinner className="mr-2" />
+                  Creando cuenta...
+                </>
+              ) : (
+                "Crear cuenta"
+              )}
+            </Button>
+          </form>
+
+          <div className="text-center text-sm">
+            <span className="text-muted-foreground">¿Ya tienes cuenta? </span>
+            <Link href="/login" className="text-primary hover:underline">
+              Iniciar sesión
+            </Link>
+          </div>
+        </div>
       </div>
     </main>
   );

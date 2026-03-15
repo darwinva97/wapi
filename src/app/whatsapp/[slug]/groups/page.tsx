@@ -29,49 +29,53 @@ export default async function GroupsPage({ params }: { params: Promise<{ slug: s
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Grupos ({groups.length})</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Descripción</TableHead>
-              <TableHead>GID</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {groups.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={3} className="text-center text-muted-foreground">
-                  No hay grupos.
-                </TableCell>
-              </TableRow>
-            ) : (
-              groups.map((group) => (
-                <TableRow key={group.id}>
-                  <TableCell className="font-medium">
-                    <Link 
-                      href={`/whatsapp/${slug}/chats/${encodeURIComponent(group.gid)}`}
-                      className="hover:underline text-primary"
-                    >
-                      {group.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {group.description || <span className="text-muted-foreground">Sin descripción</span>}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs font-mono text-muted-foreground">{group.gid}</span>
-                  </TableCell>
+    <div className="flex-1 overflow-auto">
+      <div className="p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-mono">Grupos ({groups.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Descripcion</TableHead>
+                  <TableHead>GID</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+              </TableHeader>
+              <TableBody>
+                {groups.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                      No hay grupos.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  groups.map((group) => (
+                    <TableRow key={group.id}>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/whatsapp/${slug}/chats/${encodeURIComponent(group.gid)}`}
+                          className="text-primary hover:underline"
+                        >
+                          {group.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {group.description || <span className="text-muted-foreground">Sin descripcion</span>}
+                      </TableCell>
+                      <TableCell>
+                        <code className="text-xs font-mono text-muted-foreground">{group.gid}</code>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }

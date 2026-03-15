@@ -57,23 +57,27 @@ async function UsersContent() {
   const platformConfig = await getPlatformConfig();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
           <Users className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Gestión de Usuarios</h1>
-          <p className="text-muted-foreground">
+          <h1 className="font-mono text-2xl font-bold tracking-tight">
+            Gestión de Usuarios ({users.length})
+          </h1>
+          <p className="text-sm text-muted-foreground">
             {users.length} usuario{users.length !== 1 ? "s" : ""} registrado
             {users.length !== 1 ? "s" : ""}
           </p>
         </div>
       </div>
 
+      {/* Users list */}
       <Card>
         <CardHeader>
-          <CardTitle>Usuarios</CardTitle>
+          <CardTitle className="font-mono">Usuarios</CardTitle>
           <CardDescription>
             Lista de todos los usuarios de la plataforma
           </CardDescription>
@@ -97,17 +101,25 @@ async function UsersContent() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{user.name}</span>
                       {user.role === "admin" && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge
+                          variant="secondary"
+                          className="rounded-full text-xs"
+                        >
                           Admin
                         </Badge>
                       )}
                       {user.banned && (
-                        <Badge variant="destructive" className="text-xs">
+                        <Badge
+                          variant="destructive"
+                          className="rounded-full text-xs"
+                        >
                           Baneado
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {user.email}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-sm">
@@ -130,6 +142,7 @@ async function UsersContent() {
                         ? "default"
                         : "secondary"
                     }
+                    className="rounded-full"
                   >
                     {user.config?.canCreateWhatsapp ??
                     platformConfig.allowUserCreateWhatsapp

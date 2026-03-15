@@ -88,23 +88,27 @@ export default function StoragePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center gap-4">
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-500/10 text-green-500">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10 text-green-500">
           <Database className="h-6 w-6" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Configuración de Almacenamiento</h1>
-          <p className="text-muted-foreground">
+          <h1 className="font-mono text-2xl font-bold tracking-tight">
+            Configuración de Almacenamiento
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Gestiona dónde se almacenan los archivos multimedia
           </p>
         </div>
       </div>
 
+      {/* Form */}
       <form action={formAction}>
         <Card>
           <CardHeader>
-            <CardTitle>Tipo de Almacenamiento</CardTitle>
+            <CardTitle className="font-mono">Tipo de Almacenamiento</CardTitle>
             <CardDescription>
               Selecciona dónde se guardarán los archivos multimedia
             </CardDescription>
@@ -143,7 +147,7 @@ export default function StoragePage() {
                 <HardDrive className="h-4 w-4" />
                 <AlertDescription>
                   Los archivos se guardarán en{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
                     public/media/
                   </code>{" "}
                   en el servidor local.
@@ -243,6 +247,7 @@ export default function StoragePage() {
                     size="sm"
                     onClick={handleTestConnection}
                     disabled={testing || isPending}
+                    className="rounded-full"
                   >
                     {testing ? (
                       <>
@@ -298,7 +303,11 @@ export default function StoragePage() {
             )}
 
             <div className="flex justify-end pt-4">
-              <Button type="submit" disabled={isPending}>
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="rounded-full"
+              >
                 {isPending ? (
                   <>
                     <Spinner className="mr-2 h-4 w-4" />

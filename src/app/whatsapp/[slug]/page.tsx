@@ -76,32 +76,31 @@ async function WhatsappDetailView({
   return (
     <div className="flex-1 overflow-auto">
       <div className="p-6 space-y-6">
-        {/* Account Details Card */}
+        {/* Overview Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Overview</CardTitle>
-            <CardDescription>Información y estado de la cuenta</CardDescription>
+            <CardTitle className="font-mono">Overview</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-1">
-                <div className="text-sm font-medium text-muted-foreground">Nombre</div>
-                <div className="text-sm font-medium">{wa.name}</div>
+                <p className="text-sm text-muted-foreground">Nombre</p>
+                <p className="text-sm font-medium">{wa.name}</p>
               </div>
               <div className="space-y-1">
-                <div className="text-sm font-medium text-muted-foreground">Slug</div>
-                <div className="text-sm font-mono text-xs">{wa.slug}</div>
+                <p className="text-sm text-muted-foreground">Slug</p>
+                <p className="text-sm font-mono">{wa.slug}</p>
               </div>
               <div className="space-y-1">
-                <div className="text-sm font-medium text-muted-foreground">Teléfono</div>
-                <div className="text-sm flex items-center gap-1">
-                  <Phone className="h-3 w-3" />
+                <p className="text-sm text-muted-foreground">Telefono</p>
+                <p className="text-sm flex items-center gap-1.5">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                   {wa.phoneNumber}
-                </div>
+                </p>
               </div>
               <div className="space-y-1">
-                <div className="text-sm font-medium text-muted-foreground">Descripción</div>
-                <div className="text-sm">{wa.description || "Sin descripción"}</div>
+                <p className="text-sm text-muted-foreground">Descripcion</p>
+                <p className="text-sm">{wa.description || "Sin descripcion"}</p>
               </div>
             </div>
           </CardContent>
@@ -110,15 +109,15 @@ async function WhatsappDetailView({
         {/* Connections Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold tracking-tight">Conexiones</h2>
-              <p className="text-sm text-muted-foreground">
-                {connections.length} {connections.length === 1 ? "conexión" : "conexiones"} configurada{connections.length !== 1 ? "s" : ""}
-              </p>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold tracking-tight font-mono">Conexiones</h2>
+              <Badge variant="secondary" className="rounded-full">
+                {connections.length}
+              </Badge>
             </div>
-            <Button size="sm" asChild>
+            <Button size="sm" className="rounded-full" asChild>
               <Link href={`/whatsapp/${wa.slug}/connections/create`}>
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
                 Nueva
               </Link>
             </Button>
@@ -132,14 +131,14 @@ async function WhatsappDetailView({
                 </EmptyMedia>
                 <EmptyTitle>No hay conexiones</EmptyTitle>
                 <EmptyDescription>
-                  Crea tu primera conexión para integrar esta cuenta de WhatsApp con tus aplicaciones.
+                  Crea tu primera conexion para integrar esta cuenta de WhatsApp con tus aplicaciones.
                 </EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
-                <Button asChild>
+                <Button className="rounded-full" asChild>
                   <Link href={`/whatsapp/${wa.slug}/connections/create`}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Crear conexión
+                    Crear conexion
                   </Link>
                 </Button>
               </EmptyContent>
@@ -160,34 +159,25 @@ async function WhatsappDetailView({
                             {connection.name}
                           </h3>
                           <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {connection.description || "Sin descripción"}
+                            {connection.description || "Sin descripcion"}
                           </p>
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          {connection.senderEnabled ? (
-                            <Badge variant="default" className="gap-1 text-xs">
-                              <Zap className="h-3 w-3" />
-                              Sender
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="gap-1 text-xs">
-                              <Zap className="h-3 w-3" />
-                              Sender
-                            </Badge>
-                          )}
-
-                          {connection.receiverEnabled ? (
-                            <Badge variant="default" className="gap-1 text-xs">
-                              <Webhook className="h-3 w-3" />
-                              Receiver
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="gap-1 text-xs">
-                              <Webhook className="h-3 w-3" />
-                              Receiver
-                            </Badge>
-                          )}
+                          <Badge
+                            variant={connection.senderEnabled ? "default" : "secondary"}
+                            className="gap-1.5 rounded-full text-xs"
+                          >
+                            <Zap className="h-3 w-3" />
+                            Sender
+                          </Badge>
+                          <Badge
+                            variant={connection.receiverEnabled ? "default" : "secondary"}
+                            className="gap-1.5 rounded-full text-xs"
+                          >
+                            <Webhook className="h-3 w-3" />
+                            Receiver
+                          </Badge>
                         </div>
                       </div>
                     </CardContent>

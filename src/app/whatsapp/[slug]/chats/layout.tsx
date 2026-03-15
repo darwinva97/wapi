@@ -133,10 +133,10 @@ async function ChatsLayout({
   });
 
   return (
-    <div className="flex h-full max-h-full min-h-0 overflow-hidden border rounded-lg bg-background">
+    <div className="flex h-full max-h-full min-h-0 overflow-hidden rounded-lg border bg-background">
       <div className="w-80 border-r flex flex-col h-full max-h-full min-h-0 overflow-hidden">
         <div className="p-4 border-b shrink-0 bg-background sticky top-0 z-20">
-          <h2 className="font-semibold">Conversaciones</h2>
+          <h2 className="font-mono font-semibold">Conversaciones</h2>
         </div>
         <ChatList chats={allChats} slug={slug} />
       </div>

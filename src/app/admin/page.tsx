@@ -4,10 +4,12 @@ import Link from "next/link";
 
 export default function AdminPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Panel de Administración</h1>
-        <p className="text-muted-foreground">
+        <h1 className="font-mono text-3xl font-bold tracking-tight">
+          Panel de Administración
+        </h1>
+        <p className="mt-1 text-muted-foreground">
           Gestiona la configuración global de la plataforma
         </p>
       </div>
@@ -16,11 +18,11 @@ export default function AdminPage() {
         <Link href="/admin/platform">
           <Card className="h-full transition-colors hover:bg-muted/50">
             <CardHeader className="flex flex-row items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-500/10 text-orange-500">
                 <Settings className="h-6 w-6" />
               </div>
               <div>
-                <CardTitle>Configuración de Plataforma</CardTitle>
+                <CardTitle className="font-mono">Configuración de Plataforma</CardTitle>
                 <CardDescription>
                   Registro, límites y permisos globales
                 </CardDescription>
@@ -32,11 +34,11 @@ export default function AdminPage() {
         <Link href="/admin/users">
           <Card className="h-full transition-colors hover:bg-muted/50">
             <CardHeader className="flex flex-row items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 text-blue-500">
                 <Users className="h-6 w-6" />
               </div>
               <div>
-                <CardTitle>Gestión de Usuarios</CardTitle>
+                <CardTitle className="font-mono">Gestión de Usuarios</CardTitle>
                 <CardDescription>
                   Administra usuarios y sus permisos
                 </CardDescription>
@@ -48,11 +50,11 @@ export default function AdminPage() {
         <Link href="/admin/storage">
           <Card className="h-full transition-colors hover:bg-muted/50">
             <CardHeader className="flex flex-row items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-500/10 text-green-500">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10 text-green-500">
                 <Database className="h-6 w-6" />
               </div>
               <div>
-                <CardTitle>Almacenamiento</CardTitle>
+                <CardTitle className="font-mono">Almacenamiento</CardTitle>
                 <CardDescription>
                   Configuración de storage local o S3
                 </CardDescription>
@@ -63,11 +65,11 @@ export default function AdminPage() {
 
         <Card className="h-full opacity-50">
           <CardHeader className="flex flex-row items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-500">
               <Shield className="h-6 w-6" />
             </div>
             <div>
-              <CardTitle>Seguridad</CardTitle>
+              <CardTitle className="font-mono">Seguridad</CardTitle>
               <CardDescription>
                 Próximamente: logs de auditoría
               </CardDescription>
