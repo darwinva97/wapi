@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Play, Pause, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,20 @@ function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Deterministic pseudo-random based on a seed string (avoids hydration mismatch)
+function seededRandom(seed: string): () => number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = Math.imul(31, h) + seed.charCodeAt(i) | 0;
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+    h = Math.imul(h ^ (h >>> 13), 0x45d9f3b);
+    h = (h ^ (h >>> 16)) >>> 0;
+    return (h % 1000) / 1000;
+  };
 }
 
 export function AudioPlayer({ src, fileName, fromMe }: AudioPlayerProps) {
@@ -77,6 +91,12 @@ export function AudioPlayer({ src, fileName, fromMe }: AudioPlayerProps) {
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // Generate deterministic waveform bars based on src URL
+  const waveformBars = useMemo(() => {
+    const rand = seededRandom(src);
+    return Array.from({ length: 30 }, (_, i) => 20 + Math.sin(i * 0.5) * 15 + rand() * 10);
+  }, [src]);
+
   return (
     <div className="flex items-center gap-2 min-w-[200px] max-w-[280px]">
       <audio ref={audioRef} src={src} preload="metadata" />
@@ -110,8 +130,7 @@ export function AudioPlayer({ src, fileName, fromMe }: AudioPlayerProps) {
         >
           {/* Fake waveform bars */}
           <div className="absolute inset-0 flex items-center justify-around px-1 gap-[2px]">
-            {Array.from({ length: 30 }).map((_, i) => {
-              const height = 20 + Math.sin(i * 0.5) * 15 + Math.random() * 10;
+            {waveformBars.map((height, i) => {
               const isPlayed = (i / 30) * 100 <= progress;
               return (
                 <div

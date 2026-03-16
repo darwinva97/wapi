@@ -193,7 +193,7 @@ export function ChatMessages({ initialMessages, chatId, slug, senderNames = {}, 
                 "group relative w-fit max-w-[85%] md:max-w-[75%] flex-col gap-2 rounded-lg px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
                 msg.fromMe
                   ? "ml-auto bg-primary text-primary-foreground"
-                  : "bg-muted"
+                  : "bg-card border border-border"
               )}
             >
               {/* Sender Name for Group Messages */}

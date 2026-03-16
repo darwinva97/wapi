@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { groupTable, contactTable, messageTable, chatConfigTable } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -29,108 +29,118 @@ async function ChatsLayout({
 
   if (!whatsapp) return notFound();
 
-  const groups = await db.query.groupTable.findMany({
-    where: eq(groupTable.whatsappId, whatsapp.id),
-  });
+  // Build chat list FROM MESSAGES - get all unique chatIds with their last message
+  const chatSummaries = await db
+    .select({
+      chatId: messageTable.chatId,
+      lastBody: sql<string>`(array_agg(${messageTable.body} ORDER BY ${messageTable.timestamp} DESC))[1]`,
+      lastTimestamp: sql<Date>`MAX(${messageTable.timestamp})`,
+      chatType: sql<string>`(array_agg(${messageTable.chatType} ORDER BY ${messageTable.timestamp} DESC))[1]`,
+    })
+    .from(messageTable)
+    .where(eq(messageTable.whatsappId, whatsapp.id))
+    .groupBy(messageTable.chatId)
+    .orderBy(desc(sql`MAX(${messageTable.timestamp})`));
 
-  const contacts = await db.query.contactTable.findMany({
-    where: eq(contactTable.whatsappId, whatsapp.id),
-  });
+  // Fetch contacts and groups for name resolution
+  const [contacts, groups, chatConfigs] = await Promise.all([
+    db.query.contactTable.findMany({
+      where: eq(contactTable.whatsappId, whatsapp.id),
+    }),
+    db.query.groupTable.findMany({
+      where: eq(groupTable.whatsappId, whatsapp.id),
+    }),
+    db.query.chatConfigTable.findMany({
+      where: eq(chatConfigTable.whatsappId, whatsapp.id),
+    }),
+  ]);
 
-  // Get chat configs for custom names
-  const chatConfigs = await db.query.chatConfigTable.findMany({
-    where: eq(chatConfigTable.whatsappId, whatsapp.id),
-  });
+  // Build lookup maps
   const customNameMap = new Map(
     chatConfigs
       .filter(c => c.customName)
       .map(c => [c.chatId, c.customName])
   );
 
-  // Get last message for each chat using DISTINCT ON (PostgreSQL feature)
-  const lastMessages = await db
-    .select({
-      chatId: messageTable.chatId,
-      lastMessageBody: messageTable.body,
-      lastMessageTimestamp: messageTable.timestamp,
-    })
-    .from(messageTable)
-    .where(eq(messageTable.whatsappId, whatsapp.id))
-    .orderBy(messageTable.chatId, sql`${messageTable.timestamp} DESC`)
-    .then(rows => {
-      // Group by chatId and take the first (most recent) message for each
-      const byChat = new Map<string, typeof rows[0]>();
-      for (const row of rows) {
-        if (!byChat.has(row.chatId)) {
-          byChat.set(row.chatId, row);
-        }
-      }
-      return Array.from(byChat.values());
-    });
+  const groupMap = new Map(groups.map(g => [g.gid, g]));
 
-  const lastMessageMap = new Map(
-    lastMessages.map(m => [m.chatId, { body: m.lastMessageBody, timestamp: m.lastMessageTimestamp?.getTime() ?? null }])
-  );
-
-  const allChats = [
-    ...groups.map(g => ({
-      ...g,
-      type: 'group' as const,
-      identifier: g.gid,
-      customName: customNameMap.get(g.gid) || null,
-      lastMessage: lastMessageMap.get(g.gid)?.body || null,
-      lastMessageAt: lastMessageMap.get(g.gid)?.timestamp || null,
-    })),
-    ...contacts.map(c => {
-      const pnValid = c.pn && c.pn.includes('@s.whatsapp.net');
-      const lidValid = c.lid && c.lid.includes('@lid');
-
-      // Try different JID formats for matching messages
-      const jidVariants = [
-        c.lid,
-        c.pn,
-        c.pn ? `${c.pn.split('@')[0]}@s.whatsapp.net` : null,
-      ].filter(Boolean) as string[];
-
-      // Find which JID has messages (this is the chatId used in the database)
-      const jidWithMessages = jidVariants.find(jid => lastMessageMap.has(jid));
-
-      // Use the JID that has messages, otherwise prefer LID (as WhatsApp now uses LID by default)
-      const identifier = jidWithMessages || (lidValid ? c.lid : (pnValid ? c.pn : (c.lid || c.pn)));
-
-      const lastMsg = jidVariants.reduce((found, jid) => found || lastMessageMap.get(jid), undefined as { body: string | null; timestamp: number } | undefined);
-      // Check for custom name with different JID formats
-      const customName = jidVariants.reduce((found, jid) => found || customNameMap.get(jid), undefined as string | null | undefined);
-      return {
-        ...c,
-        type: 'personal' as const,
-        identifier,
-        customName: customName || null,
-        lastMessage: lastMsg?.body || null,
-        lastMessageAt: lastMsg?.timestamp || null,
-      };
-    })
-  ].sort((a, b) => {
-    // Helper: check if name has at least one letter or number
-    const hasAlphanumeric = (name: string) => /[a-zA-Z0-9]/.test(name);
-
-    // Sort by last message timestamp (most recent first), null values go to the end
-    if (a.lastMessageAt === null && b.lastMessageAt === null) {
-      // Both have no messages - sort by name, but put names without letters/numbers at the end
-      const aName = a.name || '';
-      const bName = b.name || '';
-      const aValid = hasAlphanumeric(aName);
-      const bValid = hasAlphanumeric(bName);
-
-      if (aValid && !bValid) return -1;
-      if (!aValid && bValid) return 1;
-
-      return aName.localeCompare(bName);
+  // Build contact lookup and track which contact each chatId belongs to
+  // A contact can have multiple JIDs (lid, pn), so multiple chatIds may map to the same contact
+  const contactByJid = new Map<string, typeof contacts[0]>();
+  for (const c of contacts) {
+    if (c.lid) contactByJid.set(c.lid, c);
+    if (c.pn) contactByJid.set(c.pn, c);
+    if (c.pn) {
+      const normalized = `${c.pn.split('@')[0]}@s.whatsapp.net`;
+      contactByJid.set(normalized, c);
     }
-    if (a.lastMessageAt === null) return 1;
-    if (b.lastMessageAt === null) return -1;
-    return b.lastMessageAt - a.lastMessageAt;
-  });
+  }
+
+  // Deduplicate: merge chatIds that belong to the same contact
+  // Keep the one with the most recent message as the primary chatId
+  const seenContactIds = new Set<string>();
+  const allChats: {
+    id: string;
+    name: string;
+    pushName: string;
+    type: 'group' | 'personal';
+    identifier: string;
+    description: string | null;
+    customName: string | null;
+    lastMessage: string | null;
+    lastMessageAt: number | null;
+    pn: string | null;
+    lid: string | null;
+  }[] = [];
+
+  for (const summary of chatSummaries) {
+    const isGroup = summary.chatId.includes('@g.us');
+    const group = isGroup ? groupMap.get(summary.chatId) : null;
+    const contact = !isGroup ? contactByJid.get(summary.chatId) : null;
+
+    // Deduplicate personal chats: skip if we already have this contact
+    if (contact && !isGroup) {
+      if (seenContactIds.has(contact.id)) {
+        continue; // Already added this contact with a more recent chatId
+      }
+      seenContactIds.add(contact.id);
+    }
+
+    let name = '';
+    let pushName = '';
+    let pn: string | null = null;
+    let lid: string | null = null;
+
+    if (group) {
+      name = group.name;
+      pushName = group.pushName || '';
+    } else if (contact) {
+      name = contact.name;
+      pushName = contact.pushName || '';
+      pn = contact.pn || null;
+      lid = contact.lid || null;
+    } else {
+      // No contact/group found - extract phone from chatId
+      const phone = summary.chatId.split('@')[0];
+      name = phone;
+      pushName = '';
+      pn = summary.chatId;
+    }
+
+    allChats.push({
+      id: summary.chatId,
+      name,
+      pushName,
+      type: isGroup ? 'group' as const : 'personal' as const,
+      identifier: summary.chatId,
+      description: group?.description || null,
+      customName: customNameMap.get(summary.chatId) || null,
+      lastMessage: summary.lastBody || null,
+      lastMessageAt: summary.lastTimestamp ? new Date(summary.lastTimestamp).getTime() : null,
+      pn,
+      lid,
+    });
+  }
 
   return (
     <div className="flex h-full max-h-full min-h-0 overflow-hidden rounded-lg border bg-background">
@@ -138,7 +148,7 @@ async function ChatsLayout({
         <div className="p-4 border-b shrink-0 bg-background sticky top-0 z-20">
           <h2 className="font-mono font-semibold">Conversaciones</h2>
         </div>
-        <ChatList chats={allChats} slug={slug} />
+        <ChatList chats={allChats} slug={slug} whatsappId={whatsapp.id} />
       </div>
       <div className="flex-1 flex flex-col h-full max-h-full min-h-0 overflow-hidden">
         {children}

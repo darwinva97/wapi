@@ -42,7 +42,7 @@ export async function sendMessageAction(
     throw new Error("WhatsApp is not connected");
   }
 
-  const result = await sock.sendMessage(chatId, { text: message });
+  const result = await sock.sendMessage(chatId, { text: message, disappearingMessagesInChat: false });
 
   // Save message to database with tracking
   if (result?.key?.id) {
@@ -150,6 +150,7 @@ export async function sendMediaMessageAction(
     };
   }
 
+  (messageContent as Record<string, unknown>).disappearingMessagesInChat = false;
   const result = await sock.sendMessage(chatId, messageContent as never);
 
   // Save message to database with tracking

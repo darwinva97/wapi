@@ -1,339 +1,309 @@
 # WAPI - WhatsApp API Gateway
 
-Dashboard y API para integrar WhatsApp en tus aplicaciones. Conecta múltiples cuentas de WhatsApp, envía mensajes via API y recibe webhooks cuando llegan mensajes.
+WAPI es una plataforma self-hosted que te permite conectar cuentas de WhatsApp, visualizar chats en tiempo real, y exponer una API REST + Webhooks para integrar WhatsApp con cualquier sistema externo (CRMs, bots, n8n, Zapier, tu propia app, etc.).
 
-## ✨ Características
+## Para que sirve WAPI
 
-### 📱 Gestión de Cuentas WhatsApp
-- Conecta múltiples cuentas de WhatsApp via QR code
-- Dashboard para administrar todas tus cuentas
-- Estado de conexión en tiempo real
-- Almacenamiento de sesiones persistente
+| Caso de uso | Como lo resuelve WAPI |
+|---|---|
+| Enviar mensajes desde tu app | API REST con Bearer token por conexion |
+| Recibir mensajes en tu backend | Webhooks configurables por conexion |
+| Monitorear conversaciones | Dashboard web con chat en tiempo real |
+| Gestionar multiples numeros | Multi-cuenta con selector de WhatsApp |
+| Equipo de soporte | Sistema de miembros con roles (owner, manager, agent) |
+| Automatizar con n8n/Zapier | Sender API + Receiver Webhooks |
 
-### 🔗 Conexiones (Integraciones)
-Cada cuenta de WhatsApp puede tener múltiples "conexiones", que son integraciones bidireccionales:
+## Stack
 
-#### 📤 Sender (Enviar mensajes via API)
-- API REST para enviar mensajes
-- Autenticación via Bearer token
-- Soporte para mensajes de texto, imágenes, documentos, etc.
-- Endpoint: `POST /api/{whatsapp_slug}/{connection_slug}/sender`
+- **Next.js 16** (App Router, React 19, Turbopack)
+- **PostgreSQL** + Drizzle ORM
+- **Baileys** (WhatsApp Web API)
+- **Better Auth** (autenticacion)
+- **Tailwind CSS 4** + shadcn/ui (Lunaris design system)
+- **SSE** para actualizaciones en tiempo real
 
-#### 📥 Receiver (Webhooks)
-- Recibe mensajes entrantes via webhook
-- Configura URLs personalizadas para cada conexión
-- Headers personalizados para autenticación
-- Payload completo del mensaje incluyendo metadatos
-
-### 👥 Gestión de Contactos y Grupos
-- Sincronización automática de contactos
-- Gestión de grupos de WhatsApp
-- Historial de mensajes por chat
-
-### 🔐 Sistema de Usuarios
-- Autenticación segura con Better Auth
-- Roles de usuario (admin/user)
-- Registro público deshabilitado (solo admins crean usuarios)
-- API de administración para gestión de usuarios
-
-### 💬 Chat en Tiempo Real
-- Visualización de chats y mensajes
-- Actualizaciones via Server-Sent Events (SSE)
-- Historial de mensajes almacenado en base de datos
-- **Soporte multimedia completo**: imágenes, videos, audio, stickers y documentos
-- **Tracking de estados de entrega**: pendiente, enviado, entregado y leído
-- Almacenamiento de archivos multimedia en el servidor
-
-## 🛠️ Stack Tecnológico
-
-- **Framework:** Next.js 16 (App Router)
-- **Base de datos:** SQLite / Turso (LibSQL)
-- **ORM:** Drizzle ORM
-- **WhatsApp:** Baileys
-- **Autenticación:** Better Auth
-- **UI:** Tailwind CSS + shadcn/ui
-- **Validación:** Zod
-
-## 🚀 Instalación
+## Inicio rapido
 
 ### Prerrequisitos
+
 - Node.js 20+
 - pnpm
+- PostgreSQL (local o Docker)
 
-### 1. Clonar e instalar dependencias
+### 1. Clonar e instalar
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/darwinva97/wapi.git
 cd wapi
 pnpm install
 ```
 
 ### 2. Configurar variables de entorno
 
-Copia el archivo de ejemplo y configura tus valores:
-
 ```bash
-cp .env.example .env
+cp env.example .env
 ```
 
-Variables requeridas:
+Edita `.env`:
 
 ```env
-# Base de datos (SQLite local o Turso)
-DATABASE_URL=file:local.db
-DATABASE_AUTH_TOKEN=
+# PostgreSQL - ajusta segun tu setup
+DATABASE_URL=postgresql://user:password@localhost:5432/wapi
 
-# Better Auth
+# Better Auth - URL de tu instancia y una clave secreta de 32+ caracteres
 BETTER_AUTH_URL=http://localhost:3000
-BETTER_AUTH_SECRET=tu-clave-secreta-minimo-32-caracteres
+BETTER_AUTH_SECRET=tu-clave-secreta-de-al-menos-32-caracteres
 
 # Entorno
 NODE_ENV=development
 ```
 
-### 3. Crear tablas en la base de datos
+> Si ya tienes PostgreSQL local en el puerto 5432, puedes levantar uno en Docker en otro puerto:
+> ```bash
+> docker run -d --name wapi-postgres -e POSTGRES_USER=wapi -e POSTGRES_PASSWORD=wapi -e POSTGRES_DB=wapi -p 5433:5432 postgres:17-alpine
+> ```
+> Y usar `DATABASE_URL=postgresql://wapi:wapi@localhost:5433/wapi`
+
+### 3. Crear esquema y usuario admin
 
 ```bash
-pnpm db:push
-```
-
-### 4. Crear carpeta para archivos multimedia
-
-```bash
-mkdir -p public/media
-```
-
-La carpeta `public/media` almacenará los archivos multimedia (imágenes, videos, audio, documentos) recibidos en los mensajes. Los archivos se organizan por cuenta de WhatsApp y fecha.
-
-### 5. Crear usuario administrador
-
-```bash
-pnpm db:seed
+pnpm db:push       # Aplica el esquema a la base de datos
+pnpm db:setup      # Crea usuario admin + configuracion inicial
 ```
 
 Credenciales por defecto:
-- **Email:** admin@example.com
-- **Password:** Admin123!
+- **Email:** `admin@example.com`
+- **Password:** `Admin123!`
 
-### 5. Iniciar el servidor
+### 4. Iniciar
 
 ```bash
 pnpm dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000)
+Abre [http://localhost:3000](http://localhost:3000) e inicia sesion.
 
-## 📖 Uso
+## Como funciona
 
-### Conectar una cuenta de WhatsApp
+### Flujo basico
 
-1. Inicia sesión en el dashboard
-2. Crea una nueva cuenta de WhatsApp
-3. Escanea el código QR con tu teléfono
-4. ¡Listo! La cuenta está conectada
+```
+Tu telefono                    WAPI                         Tu app/backend
+     |                          |                                |
+     |--- escanea QR --------->|                                |
+     |    (Baileys conecta)     |                                |
+     |                          |                                |
+     |<-- mensajes entrantes --|-- webhook POST --------------->|
+     |                          |                                |
+     |                          |<-- POST /api/.../sender -------|
+     |<-- mensaje enviado -----|                                |
+```
 
-### Mensajes Multimedia
+1. **Conectas** tu WhatsApp escaneando un QR desde el dashboard
+2. **Creas conexiones** (integraciones) para cada uso: una para tu bot, otra para tu CRM, etc.
+3. Cada conexion tiene su propio **Sender** (API para enviar) y **Receiver** (webhook para recibir)
+4. Los mensajes fluyen bidireccionalmente entre WhatsApp y tus sistemas
 
-El sistema soporta los siguientes tipos de mensajes:
+### Arquitectura de conexiones
 
-- **Texto**: Mensajes de texto estándar
-- **Imágenes**: JPG, PNG, WebP (se muestran en el chat)
-- **Videos**: MP4, MKV, etc. (reproductor integrado)
-- **Audio**: OGG, MP3, etc. (reproductor de audio)
-- **Stickers**: Stickers de WhatsApp
-- **Documentos**: PDF, DOCX, etc. (enlace de descarga)
+```
+WhatsApp Account "Ventas" (wa-slug: ventas)
+  |
+  |-- Conexion "Bot de soporte" (slug: bot-soporte)
+  |     Sender: POST /api/ventas/bot-soporte/sender
+  |     Receiver: webhook a https://mi-bot.com/webhook
+  |
+  |-- Conexion "CRM" (slug: crm)
+  |     Sender: POST /api/ventas/crm/sender
+  |     Receiver: webhook a https://mi-crm.com/api/whatsapp
+  |
+  |-- Conexion "n8n" (slug: n8n)
+        Sender: POST /api/ventas/n8n/sender
+        Receiver: webhook a https://n8n.mi-servidor.com/webhook/wa
+```
 
-Los archivos multimedia se almacenan en `public/media/{whatsapp_id}/{YYYY-MM-DD}/{message_id}_{filename}` y son accesibles vía URL pública.
+## API
 
-#### Estados de Entrega (ackStatus)
-
-Cada mensaje tiene un estado de entrega que se actualiza en tiempo real:
-
-- **0**: Pendiente (⏱) - El mensaje está en cola o falló
-- **1**: Enviado (✓) - El mensaje fue enviado al servidor de WhatsApp
-- **2**: Entregado (✓✓) - El mensaje fue entregado al destinatario
-- **3**: Leído (✓✓ azul) - El destinatario leyó el mensaje
-
-Los estados se actualizan automáticamente vía SSE y se reflejan en la interfaz de chat.
-
-### Requisitos de Almacenamiento
-
-- Los archivos multimedia se almacenan en el sistema de archivos del servidor
-- Considera el espacio en disco disponible según el volumen de mensajes multimedia
-- Recomendado: al menos 10 GB libres para uso normal
-- Para producción: considerar una solución de almacenamiento escalable (S3, Cloud Storage, etc.)
-
-### Crear una conexión (integración)
-
-1. Ve a la cuenta de WhatsApp
-2. Crea una nueva conexión
-3. Configura el Sender (para enviar mensajes):
-   - Habilita el sender
-   - Copia el token generado
-4. Configura el Receiver (para recibir mensajes):
-   - Habilita el receiver
-   - Ingresa la URL de tu webhook
-   - Agrega headers si es necesario
-
-### Enviar mensajes via API
+### Enviar mensajes
 
 ```bash
-curl -X POST "http://localhost:3000/api/{whatsapp_slug}/{connection_slug}/sender" \
-  -H "Authorization: Bearer {tu-token}" \
+curl -X POST "http://localhost:3000/api/{wa_slug}/{connection_slug}/sender" \
+  -H "Authorization: Bearer {token}" \
   -H "Content-Type: application/json" \
   -d '{
-    "to": "1234567890",
+    "to": "5491155551234",
     "message": { "text": "Hola desde WAPI!" }
   }'
 ```
 
-### Formato del webhook (mensajes entrantes)
+El campo `message` acepta cualquier formato de mensaje de Baileys:
 
-Tu endpoint recibirá un POST con este formato:
+```json
+// Texto
+{ "text": "Hola!" }
+
+// Imagen
+{ "image": { "url": "https://..." }, "caption": "Mira esto" }
+
+// Documento
+{ "document": { "url": "https://..." }, "fileName": "factura.pdf", "mimetype": "application/pdf" }
+
+// Ubicacion
+{ "location": { "degreesLatitude": 24.121, "degreesLongitude": 55.1121 } }
+```
+
+### Recibir mensajes (Webhook)
+
+Configura una URL de webhook en tu conexion. WAPI hara un POST a esa URL cuando llegue un mensaje:
 
 ```json
 {
   "messages": [
     {
       "key": {
-        "remoteJid": "1234567890@s.whatsapp.net",
+        "remoteJid": "5491155551234@s.whatsapp.net",
         "fromMe": false,
-        "id": "MESSAGE_ID"
+        "id": "ABC123"
       },
       "message": {
-        "conversation": "Hola!"
+        "conversation": "Hola, quiero informacion"
       },
       "messageTimestamp": 1704470400,
-      "pushName": "Nombre del contacto"
+      "pushName": "Juan Perez"
     }
   ],
   "type": "notify"
 }
 ```
 
-## 📁 Estructura del Proyecto
+Puedes configurar headers personalizados (API keys, tokens) en la configuracion del receiver.
 
-```
-src/
-├── app/
-│   ├── api/
-│   │   ├── [whatsapp_slug]/[connection_slug]/sender/  # API para enviar
-│   │   ├── admin/users/create/                        # API admin
-│   │   ├── auth/                                      # Better Auth
-│   │   └── whatsapp/[id]/qr/                         # SSE para QR
-│   ├── whatsapp/[slug]/                              # Dashboard WhatsApp
-│   │   ├── connections/[connectionSlug]/             # Gestión conexiones
-│   │   └── chats/                                    # Visualizar chats
-│   └── login/                                        # Página de login
-├── components/ui/                                    # Componentes shadcn
-├── db/
-│   ├── schema/                                       # Esquema Drizzle
-│   └── seed.ts                                       # Seeder
-├── lib/
-│   ├── auth.ts                                       # Configuración Better Auth
-│   ├── whatsapp.ts                                   # Lógica Baileys
-│   └── whatsapp-utils.ts                             # Utilidades
-└── config/                                           # Variables de entorno
-```
+## Funcionalidades del Dashboard
 
-## 🔧 Scripts Disponibles
+### Chat en tiempo real
+- Visualiza todas las conversaciones (personales y grupos)
+- Envia mensajes de texto y archivos multimedia
+- Reproductor de audio/video integrado
+- Reacciones a mensajes
+- Fotos de perfil de contactos (carga lazy)
+- Infinite scroll en la lista de chats
+- Estados de entrega: pendiente, enviado, entregado, leido
+- Actualizaciones en tiempo real via SSE
 
-| Comando | Descripción |
-|---------|-------------|
-| `pnpm dev` | Inicia el servidor de desarrollo |
-| `pnpm build` | Compila para producción |
-| `pnpm start` | Inicia el servidor de producción |
-| `pnpm db:push` | Aplica el esquema a la base de datos |
-| `pnpm db:studio` | Abre Drizzle Studio |
-| `pnpm db:seed` | Crea el usuario admin |
-| `pnpm lint` | Ejecuta ESLint |
+### Multimedia soportado
+| Tipo | Formatos | En el chat |
+|---|---|---|
+| Imagenes | JPG, PNG, WebP | Vista previa + click para ampliar |
+| Videos | MP4, MKV, etc. | Reproductor integrado |
+| Audio | OGG, MP3, etc. | Reproductor con waveform |
+| Stickers | WebP animado | Render directo |
+| Documentos | PDF, DOCX, etc. | Enlace de descarga |
+| Ubicaciones | Lat/Lng | Link a Google Maps |
 
-## �️ Roadmap
+### Gestion de equipo
+- **Owner**: Control total, puede eliminar la instancia
+- **Manager**: Gestiona conexiones y miembros
+- **Agent**: Puede ver chats y enviar mensajes
 
-Consulta el [CHANGELOG.md](CHANGELOG.md) para ver las características planeadas. Algunas de las próximas mejoras incluyen:
+### Panel de administracion
+- Configuracion de plataforma (registro, limites)
+- Gestion de usuarios
+- Storage: local o S3-compatible (AWS S3, MinIO, Cloudflare R2, etc.)
+- Limpieza automatica de archivos multimedia
 
-### Receiver Filter Avanzado
-El filtro de receiver actual solo soporta JSON estático. Próximamente:
+## Almacenamiento de media
 
-- **Evaluación JavaScript**: Escribir funciones JS que evalúen mensajes
-  ```javascript
-  (msg) => !msg.key.fromMe && msg.message?.conversation?.includes("pedido")
-  ```
+Los archivos multimedia se guardan en `public/media/{whatsapp_id}/{fecha}/{mensaje_id}_{archivo}`.
 
-- **Plantillas HTTP**: Validar mensajes contra una API externa antes de enviar el webhook
-  ```json
-  {
-    "type": "http",
-    "url": "https://mi-api.com/validate",
-    "expectStatus": 200
-  }
-  ```
+Para produccion, configura S3-compatible en **Admin > Almacenamiento**:
+- AWS S3
+- MinIO (self-hosted)
+- Cloudflare R2
+- DigitalOcean Spaces
+- Cualquier servicio compatible con la API de S3
 
-### Otras Mejoras Planeadas
-- 📊 Métricas y estadísticas de uso
-- 🔄 Retry automático de webhooks fallidos
-- 📝 Templates de mensajes reutilizables
-- 🔗 Transformadores de payload personalizados
-- ⏰ Mensajes programados
-- 🔐 Seguridad avanzada (HMAC, IP whitelist)
-- 🤖 Integraciones nativas (n8n, Zapier)
-- 💬 Respuestas automáticas configurables
+## Scripts disponibles
 
-## � Despliegue
+| Comando | Que hace |
+|---|---|
+| `pnpm dev` | Servidor de desarrollo (Turbopack) |
+| `pnpm build` | Compilar para produccion |
+| `pnpm start` | Servidor de produccion |
+| `pnpm db:push` | Aplicar esquema a la base de datos |
+| `pnpm db:studio` | Abrir Drizzle Studio (explorar DB) |
+| `pnpm db:setup` | Crear admin + configuracion inicial |
+| `pnpm db:seed` | Solo crear usuario admin |
+| `pnpm lint` | Ejecutar ESLint |
 
-### Docker y Kubernetes
+## Despliegue
 
-Este proyecto está listo para desplegarse en contenedores Docker y en clusters de Kubernetes (k8s, k3s, minikube, etc.):
-
-#### Docker Local
+### Docker
 
 ```bash
 # Desarrollo con hot reload
 docker-compose --profile dev up wapi-dev
 
-# Producción
+# Produccion
 docker-compose up
 ```
 
-#### Kubernetes
+### Kubernetes
 
 ```bash
-# Despliegue completo (construir, subir, desplegar)
+# Despliegue completo
 IMAGE_NAME=your-registry/wapi IMAGE_TAG=v1.0.0 ./deploy.sh full
 
 # Ver estado
 ./deploy.sh status
-
-# Ver logs
-./deploy.sh logs
 ```
 
-**Documentación completa:**
-- [Guía Rápida de Kubernetes](docs/KUBERNETES_QUICKSTART.md) - Inicio rápido
-- [Documentación Completa de Kubernetes](docs/KUBERNETES.md) - Guía detallada
-- [Guía Específica para k3s](docs/K3S.md) - Despliegue en k3s
+Caracteristicas del despliegue:
+- Multi-stage Dockerfile optimizado
+- Volumenes persistentes para sesiones y media
+- ConfigMaps y Secrets
+- Health checks y resource limits
+- Soporte para Kustomize
 
-**Características del despliegue en Kubernetes:**
-- ✅ Multi-stage Dockerfile optimizado
-- ✅ Manifiestos completos de K8s (Deployment, Service, Ingress, PVC)
-- ✅ Volúmenes persistentes para sesiones y media
-- ✅ ConfigMaps y Secrets para configuración
-- ✅ Health checks y resource limits
-- ✅ Script de despliegue automatizado
-- ✅ Soporte para Kustomize
+Documentacion detallada:
+- [Guia Rapida de Kubernetes](docs/KUBERNETES_QUICKSTART.md)
+- [Documentacion Completa](docs/KUBERNETES.md)
+- [Guia para k3s](docs/K3S.md)
 
-## 📚 Documentación Adicional
+## Estructura del proyecto
 
-- [API de Administración](docs/ADMIN_API.md)
-- **Despliegue en Kubernetes:**
-  - [Guía Rápida](docs/KUBERNETES_QUICKSTART.md)
-  - [Documentación Completa](docs/KUBERNETES.md)
-  - [Guía para k3s](docs/K3S.md) - Despliegue en k3s
-  - [Arquitectura](docs/KUBERNETES_ARCHITECTURE.md)
-  - [Despliegue en Kubernetes - Arquitectura](docs/KUBERNETES_ARCHITECTURE.md)
-- [Checklist de Configuración](KUBERNETES_SETUP_CHECKLIST.md)
-- [Changelog](CHANGELOG.md)
+```
+src/
+  app/
+    api/
+      [wa_slug]/[conn_slug]/sender/  # API para enviar mensajes
+      admin/                          # APIs de administracion
+      auth/                           # Better Auth endpoints
+      sse/chat/[chatId]/              # Server-Sent Events
+      whatsapp/[id]/qr/              # QR code via SSE
+      whatsapp/[id]/profile-picture/  # Fotos de perfil
+    admin/                            # Panel de administracion
+    whatsapp/
+      create/                         # Crear cuenta WhatsApp
+      [slug]/                         # Dashboard por cuenta
+        chats/                        # Vista de chats
+        contacts/                     # Lista de contactos
+        groups/                       # Lista de grupos
+        members/                      # Gestion de miembros
+        connections/                  # Integraciones
+        settings/                     # Configuracion
+    login/ signup/                    # Autenticacion
+  components/
+    ui/                               # shadcn/ui (Lunaris)
+    logout-button.tsx                 # Componente de logout
+  db/
+    schema/                           # Esquema Drizzle (PostgreSQL)
+    setup.ts                          # Setup inicial
+  lib/
+    auth.ts                           # Better Auth config
+    whatsapp.ts                       # Logica Baileys
+    storage.ts                        # Storage local/S3
+```
 
-## 📝 Licencia
+## Licencia
 
 Privado - Todos los derechos reservados
