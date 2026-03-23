@@ -1,0 +1,131 @@
+import { db } from "@/db";
+import { whatsappTable, groupTable, contactTable, chatConfigTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { notFound } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+import { Suspense } from "react";
+
+async function ChatsLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ slug: string; connectionSlug: string }>;
+}) {
+  const { slug, connectionSlug } = await params;
+
+  const whatsapp = await db.query.whatsappTable.findFirst({
+    where: eq(whatsappTable.slug, slug),
+  });
+
+  if (!whatsapp) return notFound();
+
+  const groups = await db.query.groupTable.findMany({
+    where: eq(groupTable.whatsappId, whatsapp.id),
+  });
+
+  const contacts = await db.query.contactTable.findMany({
+    where: eq(contactTable.whatsappId, whatsapp.id),
+  });
+
+  // Get chat configs for custom names
+  const chatConfigs = await db.query.chatConfigTable.findMany({
+    where: eq(chatConfigTable.whatsappId, whatsapp.id),
+  });
+  const customNameMap = new Map(
+    chatConfigs
+      .filter(c => c.customName)
+      .map(c => [c.chatId, c.customName])
+  );
+
+  const allChats = [
+    ...groups.map(g => ({
+      ...g,
+      type: 'group' as const,
+      identifier: g.gid,
+      customName: customNameMap.get(g.gid) || null,
+    })),
+    ...contacts.map(c => {
+      const identifier = c.pn || c.lid;
+      // Try different JID formats for custom name lookup
+      const jidVariants = [
+        identifier,
+        `${identifier}@s.whatsapp.net`,
+        identifier.replace('@s.whatsapp.net', ''),
+      ];
+      const customName = jidVariants.reduce((found, jid) => found || customNameMap.get(jid), undefined as string | null | undefined);
+      return {
+        ...c,
+        type: 'personal' as const,
+        identifier,
+        customName: customName || null,
+      };
+    })
+  ].sort((a, b) => {
+    const nameA = a.customName || a.name || '';
+    const nameB = b.customName || b.name || '';
+    return nameA.localeCompare(nameB);
+  });
+
+  return (
+    <div className="flex h-full max-h-full min-h-0 overflow-hidden border rounded-lg bg-background">
+      <div className="w-80 border-r flex flex-col h-full max-h-full min-h-0 overflow-hidden">
+        <div className="p-4 border-b shrink-0 bg-background sticky top-0 z-20">
+          <h2 className="font-semibold">Chats</h2>
+        </div>
+        <ScrollArea className="flex-1 min-h-0 overflow-auto">
+          <div className="flex flex-col gap-1 p-2">
+            {allChats.map((chat) => {
+              const displayName = chat.customName || chat.name;
+              return (
+                <Link
+                  key={chat.id}
+                  href={`/whatsapp/${slug}/connections/${connectionSlug}/chats/${encodeURIComponent(chat.identifier)}`}
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors text-left"
+                  )}
+                >
+                  <Avatar>
+                    <AvatarFallback>{displayName?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium truncate">{displayName}</span>
+                      {chat.type === 'group' && <Badge variant="secondary" className="text-[10px] h-4 px-1">Group</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {chat.type === 'group' ? chat.description : chat.pushName}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      </div>
+      <div className="flex-1 flex flex-col h-full max-h-full min-h-0 overflow-hidden">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export default async function ChatsLayoutWrapper({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ slug: string; connectionSlug: string }>;
+}) {
+  return (
+    <Suspense fallback={<div className="flex-1 flex items-center justify-center">Cargando chats...</div>}>
+      <ChatsLayout params={params}>
+        {children}
+      </ChatsLayout>
+    </Suspense>
+  )
+}

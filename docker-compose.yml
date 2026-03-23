@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  wapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+        BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+        BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+    image: wapi:local
+    container_name: wapi
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_AUTH_TOKEN=${DATABASE_AUTH_TOKEN}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - NEXT_TELEMETRY_DISABLED=1
+    volumes:
+      - ./whatsapp_sessions:/app/whatsapp_sessions
+      - ./public/media:/app/public/media
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Optional: Para desarrollo con hot reload
+  wapi-dev:
+    profiles: ["dev"]
+    build:
+      context: .
+      target: deps
+    image: wapi:dev
+    container_name: wapi-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_AUTH_TOKEN=${DATABASE_AUTH_TOKEN}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - NEXT_TELEMETRY_DISABLED=1
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      - ./whatsapp_sessions:/app/whatsapp_sessions
+      - ./public/media:/app/public/media
+    command: pnpm dev
+    restart: unless-stopped

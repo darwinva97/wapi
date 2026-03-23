@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wapi
+  namespace: wapi
+  labels:
+    app: wapi
+spec:
+  replicas: 1
+  # IMPORTANT: Do not scale beyond 1 replica due to WhatsApp session management
+  # WhatsApp sessions require persistent storage and can't be shared between pods
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: wapi
+  template:
+    metadata:
+      labels:
+        app: wapi
+    spec:
+      containers:
+      - name: wapi
+        # Replace with your actual image
+        image: your-registry/wapi:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        # Environment variables from ConfigMap
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: wapi-config
+              key: NODE_ENV
+        - name: NEXT_TELEMETRY_DISABLED
+          valueFrom:
+            configMapKeyRef:
+              name: wapi-config
+              key: NEXT_TELEMETRY_DISABLED
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: wapi-config
+              key: PORT
+        - name: HOSTNAME
+          valueFrom:
+            configMapKeyRef:
+              name: wapi-config
+              key: HOSTNAME
+        - name: BETTER_AUTH_URL
+          valueFrom:
+            configMapKeyRef:
+              name: wapi-config
+              key: BETTER_AUTH_URL
+        # Environment variables from Secret
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: wapi-secrets
+              key: DATABASE_URL
+        - name: DATABASE_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: wapi-secrets
+              key: DATABASE_AUTH_TOKEN
+        - name: BETTER_AUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: wapi-secrets
+              key: BETTER_AUTH_SECRET
+        volumeMounts:
+        - name: whatsapp-sessions
+          mountPath: /app/whatsapp_sessions
+        - name: media
+          mountPath: /app/public/media
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: whatsapp-sessions
+        persistentVolumeClaim:
+          claimName: wapi-whatsapp-sessions
+      - name: media
+        persistentVolumeClaim:
+          claimName: wapi-media
+      # Optional: Add image pull secrets if using private registry
+      # imagePullSecrets:
+      # - name: registry-secret

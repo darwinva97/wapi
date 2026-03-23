@@ -1,0 +1,70 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# Testing
+coverage
+.nyc_output
+
+# Next.js
+.next
+out
+
+# Production
+dist
+build
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Local env files
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Documentation
+*.md
+!README.md
+
+# Kubernetes
+kubernetes
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Drizzle
+drizzle
+
+# WhatsApp sessions (will be mounted as volume)
+whatsapp_sessions
+
+# Media files (will be mounted as volume)
+public/media

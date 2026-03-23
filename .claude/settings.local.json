@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install)",
+      "Bash(npm install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(npm run build:*)",
+      "Bash(export PATH=\"$HOME/.local/share/pnpm:$PATH\")",
+      "Bash(npm run db:generate:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)",
+      "Bash(bun add:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(grep:*)",
+      "Bash(bun run build:*)",
+      "Bash(xargs cat:*)",
+      "Bash(find:*)",
+      "Bash(corepack enable:*)",
+      "Bash(npx pnpm install)",
+      "Bash(psql:*)",
+      "Bash(lsof:*)",
+      "Bash(ss:*)",
+      "Bash(curl:*)",
+      "Bash(pgrep:*)",
+      "Bash(npx tsx:*)"
+    ]
+  }
+}

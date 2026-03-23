@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wapi
+  namespace: wapi
+  annotations:
+    # Uncomment and configure based on your ingress controller
+    # For nginx-ingress:
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    
+    # For traefik:
+    # traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    # traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  # Uncomment if using TLS/SSL
+  # tls:
+  # - hosts:
+  #   - your-domain.com
+  #   secretName: wapi-tls
+  rules:
+  - host: your-domain.com  # Replace with your actual domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: wapi
+            port:
+              number: 80
